@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.minorityhobbies</groupId>
 	<artifactId>jutils</artifactId>
-	<version>1.0</version>
+	<version>1.1-SNAPSHOT</version>
 	<name>Core Java Utilities module</name>
 
 	<dependencies>
@@ -14,6 +14,19 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
+
+    <distributionManagement>
+        <repository>
+            <id>releases-repository</id>
+            <uniqueVersion>false</uniqueVersion>
+            <url>scpexe://minorityhobbies.com/maven/repositories/releases</url>
+        </repository>
+        <snapshotRepository>
+            <id>releases-repository</id>
+            <uniqueVersion>true</uniqueVersion> 
+            <url>scpexe://minorityhobbies.com/maven/repositories/snapshots</url>
+        </snapshotRepository>
+    </distributionManagement>
 
 	<build>
 		<plugins>
@@ -27,5 +40,12 @@
 				</configuration>
 			</plugin>
 		</plugins>
+        <extensions>
+            <extension>
+                <groupId>org.apache.maven.wagon</groupId>
+                <artifactId>wagon-ssh-external</artifactId>
+                <version>1.0-beta-6</version>
+            </extension>
+        </extensions>
 	</build>
 </project>
