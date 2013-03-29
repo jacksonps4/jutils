@@ -9,13 +9,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 */
 package com.minorityhobbies.util;
 
-import java.io.BufferedReader;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.LinkedList;
@@ -28,8 +27,6 @@ import java.util.concurrent.Executors;
  * 
  */
 public class FileUtils {
-	private static final String NEWLINE = System.getProperty("line.separator");
-
 	private FileUtils() {
 	}
 
@@ -43,19 +40,18 @@ public class FileUtils {
 	 *             If an I/O error occurred reading the file.
 	 */
 	public static String readFile(File file) throws IOException {
-		BufferedReader reader = null;
+		InputStream in = null;
 		try {
-			reader = new BufferedReader(new InputStreamReader(
-					new FileInputStream(file)));
+			in = new FileInputStream(file);
+			byte[] b = new byte[1024 * 64];
 			StringBuilder fileData = new StringBuilder();
-			for (String line = null; (line = reader.readLine()) != null;) {
-				fileData.append(line);
-				fileData.append(NEWLINE);
+			for (int read = 0; (read = in.read(b)) > -1; ) {
+				fileData.append(new String(b, 0, read));
 			}
 			return fileData.toString();
 		} finally {
-			if (reader != null) {
-				reader.close();
+			if (in != null) {
+				in.close();
 			}
 		}
 	}
@@ -117,7 +113,8 @@ public class FileUtils {
 	 */
 	public static Closeable followTail(final File f,
 			final Performer<String> newLineCallback) throws IOException {
-		final FileChannel fc = new FileInputStream(f).getChannel();
+		final FileInputStream fin = new FileInputStream(f);
+		final FileChannel fc = fin.getChannel();
 
 		ExecutorService thread = Executors.newSingleThreadExecutor();
 		thread.submit(new Runnable() {
@@ -154,7 +151,7 @@ public class FileUtils {
 		return new Closeable() {
 			@Override
 			public void close() throws IOException {
-				fc.close();
+				fin.close();
 			}
 		};
 	}

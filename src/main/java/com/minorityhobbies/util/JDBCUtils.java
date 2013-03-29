@@ -101,10 +101,11 @@ public class JDBCUtils {
 				}
 
 				Statement statement = null;
+				BufferedReader reader = null;
 				try {
 					statement = connection.createStatement();
 
-					BufferedReader reader = new BufferedReader(new FileReader(
+					reader = new BufferedReader(new FileReader(
 							sqlFile));
 					StringBuilder stmt = new StringBuilder();
 					for (String line = null; (line = reader.readLine()) != null;) {
@@ -125,8 +126,19 @@ public class JDBCUtils {
 								sqlFile.getName(), count++, updates.length, i));
 					}
 				} finally {
+					if (reader != null) {
+						try {
+							reader.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
 					if (statement != null) {
-						statement.close();
+						try {
+							statement.close();
+						} catch (SQLException e) {
+							e.printStackTrace();
+						}
 					}
 				}
 			}

@@ -16,7 +16,7 @@ import org.junit.Test;
 import org.junit.Ignore;
 
 public class FileUtilsTest {
-	private static final String FILE_DATA = "Some data\n";
+	private static final String FILE_DATA = "Nothing particularly useful";
 
 	@Test
 	public void testReadFileFile() throws IOException, URISyntaxException {
