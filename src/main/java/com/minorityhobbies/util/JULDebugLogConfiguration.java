@@ -16,6 +16,15 @@ import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
+/**
+ * Provides a simple way to use the built-in Java {@link Logger} framework. 
+ * By default, the configuration is a little tricky to set up. This gives
+ * a straightforward method of making your application format its logs in
+ * a sensible fashion using Java logging.
+ * 
+ * Using this class sets the log level to FINE. 
+ * For INFO, use {@link JULStandardLogConfiguration}.
+ */
 public class JULDebugLogConfiguration {
     private final LogManager logManager;
     private final Logger rootLogger;
