@@ -5,14 +5,18 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import javax.net.ssl.SSLServerSocketFactory;
+
 class StandardSocketServerBusMessageConnection implements BusMessageConnection {
-	private final int port;
+	private final URI localServiceUri;
 	private final ServerSocket server;
 	private final ExecutorService executor;
 	private final StandardBusMessageSerialiser serialiser = new StandardBusMessageSerialiser();
@@ -23,13 +27,35 @@ class StandardSocketServerBusMessageConnection implements BusMessageConnection {
 			throws IOException {
 		super();
 		this.executor = Executors.newCachedThreadPool();
-		this.port = port;
+		try {
+			this.localServiceUri = new URI(String.format("socket://0.0.0.0:%d",
+					port));
+		} catch (URISyntaxException e) {
+			throw new RuntimeException(e);
+		}
 		this.server = new ServerSocket();
+	}
+
+	public StandardSocketServerBusMessageConnection(URI localServiceUri)
+			throws IOException {
+		super();
+		this.executor = Executors.newCachedThreadPool();
+		this.localServiceUri = localServiceUri;
+		if ("socket".equals(localServiceUri.getScheme())) {
+			this.server = new ServerSocket();
+		} else if ("ssl".equals(localServiceUri.getScheme())) {
+			this.server = SSLServerSocketFactory.getDefault()
+					.createServerSocket();
+		} else {
+			throw new IllegalArgumentException("Unsupported URI scheme: "
+					+ localServiceUri.getScheme());
+		}
 	}
 
 	@Override
 	public void start() throws IOException {
-		this.server.bind(new InetSocketAddress(port));
+		this.server.bind(new InetSocketAddress(localServiceUri.getHost(),
+				localServiceUri.getPort()));
 
 		executor.submit(new Callable<Void>() {
 			@Override

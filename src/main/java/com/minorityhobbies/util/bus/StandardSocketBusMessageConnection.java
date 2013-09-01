@@ -11,6 +11,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import javax.net.ssl.SSLSocketFactory;
+
 class StandardSocketBusMessageConnection implements BusMessageConnection {
 	private final StandardBusMessageSerialiser serialiser = new StandardBusMessageSerialiser();
 	private final Map<BusMessageSubscription, BusMessageHandler> subscriptions = new ConcurrentHashMap<BusMessageSubscription, BusMessageHandler>();
@@ -32,7 +34,12 @@ class StandardSocketBusMessageConnection implements BusMessageConnection {
 
 	@Override
 	public void start() throws IOException {
-		this.socket = new Socket(uri.getHost(), uri.getPort());
+		if ("socket".equals(uri.getScheme())) {
+			this.socket = new Socket(uri.getHost(), uri.getPort());
+		} else if ("ssl".equals(uri.getScheme())) {
+			this.socket = SSLSocketFactory.getDefault().createSocket(
+					uri.getHost(), uri.getPort());
+		}
 		this.in = new DataInputStream(socket.getInputStream());
 		this.out = new DataOutputStream(socket.getOutputStream());
 		executor.submit(new StandardSocketBusMessageConnectionStreamReader(in,
@@ -62,5 +69,30 @@ class StandardSocketBusMessageConnection implements BusMessageConnection {
 			e.printStackTrace();
 		}
 		executor.shutdownNow();
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((uri == null) ? 0 : uri.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		StandardSocketBusMessageConnection other = (StandardSocketBusMessageConnection) obj;
+		if (uri == null) {
+			if (other.uri != null)
+				return false;
+		} else if (!uri.equals(other.uri))
+			return false;
+		return true;
 	}
 }

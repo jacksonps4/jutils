@@ -24,7 +24,7 @@ class StandardBusMessageSerialiser {
 		try {
 			reader = new BufferedReader(new StringReader(new String(msg, Charset.forName("UTF-8"))));
 			Map<String, String> msgValues = new HashMap<String, String>();
-			for (String line = null; (line = reader.readLine()) != null; ) {
+			for (String line = null; (line = reader.readLine()) != null && line.trim().length() > 0; ) {
 				String[] attributes = line.split("\u0003");
 				if (attributes.length != 2) {
 					throw new IOException("Desserialisation failure");

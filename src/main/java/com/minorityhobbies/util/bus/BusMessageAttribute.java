@@ -1,6 +1,6 @@
 package com.minorityhobbies.util.bus;
 
-enum BusMessageAttribute {
+public enum BusMessageAttribute {
 	MESSAGE_ID("_id"), SOURCE("_src"), DESTINATION("_dst"), MESSAGE_TYPE(
 			"_type");
 
@@ -10,7 +10,11 @@ enum BusMessageAttribute {
 		this.attributeName = attributeName;
 	}
 
-	public String getAttributeName() {
+	String getAttributeName() {
 		return attributeName;
+	}
+	
+	public String get(BusMessage m) {
+		return m.get(attributeName);
 	}
 }

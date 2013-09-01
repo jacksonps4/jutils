@@ -1,17 +1,21 @@
 package com.minorityhobbies.util.bus;
 
-import java.io.Closeable;
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-class StandardBusServer implements BusServer, Closeable {
+class StandardBusServer implements BusServer {
 	private final Bus internalBus;
 	private final BusMessageSubscriptions subscriptions;
-	private final List<BusMessageConnection> connections;
+	private final Map<BusMessageConnection, BusMessageSubscriptionHandle> connections;
+	private final ReadWriteLock connectionLock = new ReentrantReadWriteLock();
+	private BusMessageSubscriptionHandle handle;
+	private volatile boolean started = false;
 
 	public StandardBusServer(Bus internalBus) {
-		connections = new LinkedList<BusMessageConnection>();
+		connections = new HashMap<BusMessageConnection, BusMessageSubscriptionHandle>();
 
 		this.internalBus = internalBus;
 
@@ -19,48 +23,131 @@ class StandardBusServer implements BusServer, Closeable {
 	}
 
 	@Override
-	public void addConnection(BusMessageConnection connection) {
-		connections.add(connection);
+	public void addConnection(BusMessageConnection connection)
+			throws IOException {
+		try {
+			connectionLock.readLock().lock();
+			BusMessageSubscriptionHandle handle = connections.get(connection);
+			if (handle != null) {
+				return;
+			}
+		} finally {
+			connectionLock.readLock().unlock();
+		}
+		
+		try {
+			connectionLock.writeLock().lock();
+			if (started) {
+				startConnection(connection);
+			} else {
+				connections.put(connection, null);
+			}
+		} finally {
+			connectionLock.writeLock().unlock();
+		}
+	}
+
+	private void startConnection(BusMessageConnection connection)
+			throws IOException {
+		// you must already have the appropriate write lock to call this method:
+		BusMessageSubscriptionHandle handle = connection.pull(internalBus
+				.getSubscriptions().newAllMessagesSubscription(),
+				new BusMessageHandler() {
+					@Override
+					public void onMessage(BusMessage msg) {
+						internalBus.publish(new LocalBusMessage(msg
+								.getAttributes()));
+					}
+				});
+		connections.put(connection, handle);
+		connection.start();
+	}
+
+	@Override
+	public void removeConnection(BusMessageConnection connection)
+			throws IOException {
+		try {
+			connectionLock.writeLock().lock();
+			BusMessageSubscriptionHandle handle = connections.remove(connection);
+			handle.close();
+		} catch (IOException e) { 
+			e.printStackTrace();
+		} finally {
+			connectionLock.writeLock().unlock();
+		}
 	}
 
 	@Override
 	public void start() throws IOException {
-		internalBus.subscribe(subscriptions.newAllMessagesSubscription(),
+		started = true;
+
+		// push all messages received from the internal message bus to
+		// all connections
+		handle = internalBus.subscribe(subscriptions.newAllMessagesSubscription(),
 				new BusMessageHandler() {
 					@Override
 					public void onMessage(BusMessage msg) {
-						for (BusMessageConnection connection : connections) {
-							if (!(msg instanceof LocalBusMessage)) {
-								try {
-									connection.push(msg);
-								} catch (IOException e) {
-									e.printStackTrace();
+						try {
+							connectionLock.readLock().lock();
+							for (BusMessageConnection connection : connections.keySet()) {
+								if (!(msg instanceof LocalBusMessage)) {
+									try {
+										connection.push(msg);
+									} catch (IOException e) {
+										try {
+											removeConnection(connection);
+										} catch (IOException io) {
+											io.printStackTrace();
+										}
+									}
 								}
 							}
+						} finally {
+							connectionLock.readLock().unlock();
 						}
 					}
 				});
 
-		for (BusMessageConnection connection : connections) {
-			connection.pull(internalBus.getSubscriptions()
-					.newAllMessagesSubscription(), new BusMessageHandler() {
-				@Override
-				public void onMessage(BusMessage msg) {
-					internalBus.publish(new LocalBusMessage(msg.getAttributes()));
-				}
-			});
-			connection.start();
+		// publish all messages pulled from each connection to the internal bus
+		// as a LocalBusMessage
+		try {
+			connectionLock.writeLock().lock();
+			for (BusMessageConnection connection : connections.keySet()) {
+				startConnection(connection);
+			}
+		} finally {
+			connectionLock.writeLock().unlock();
 		}
 	}
 
 	@Override
 	public void close() throws IOException {
-		for (BusMessageConnection connection : connections) {
+		if (handle != null) {
 			try {
-				connection.close();
+				handle.close();
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
+		}
+		
+		try {
+			connectionLock.writeLock().lock();
+			for (Map.Entry<BusMessageConnection, BusMessageSubscriptionHandle> connectionEntry : connections.entrySet()) {
+				BusMessageConnection connection = connectionEntry.getKey();
+				BusMessageSubscriptionHandle handle = connectionEntry.getValue();
+				try {
+					handle.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				try {
+					connection.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		} finally {
+			connectionLock.writeLock().unlock();
 		}
 	}
 }
