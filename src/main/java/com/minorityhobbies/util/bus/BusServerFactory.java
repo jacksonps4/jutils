@@ -1,8 +1,10 @@
 package com.minorityhobbies.util.bus;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -27,10 +29,13 @@ public class BusServerFactory {
 
 	public BusServerFactory listenOn(int port) {
 		try {
-			this.localServiceUri = new URI(String.format("socket://0.0.0.0:%d",
-					port));
+			String address = InetAddress.getLocalHost().getHostAddress();
+			this.localServiceUri = new URI(String.format("socket://%s:%d",
+					address, port));
 			return this;
 		} catch (URISyntaxException e) {
+			throw new RuntimeException(e);
+		} catch (UnknownHostException e) {
 			throw new RuntimeException(e);
 		}
 	}

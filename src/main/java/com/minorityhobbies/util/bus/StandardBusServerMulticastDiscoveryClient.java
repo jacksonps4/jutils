@@ -3,6 +3,7 @@ package com.minorityhobbies.util.bus;
 import static com.minorityhobbies.util.bus.BusMessageAttribute.MESSAGE_TYPE;
 import static com.minorityhobbies.util.bus.BusMessageAttribute.SOURCE;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
@@ -10,16 +11,20 @@ import java.net.MulticastSocket;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.logging.Logger;
 
 class StandardBusServerMulticastDiscoveryClient implements BusMessageConnection {
+	private final Logger logger = Logger.getLogger(getClass().getName());
 	private final ExecutorService executor;
 	private final BusServer busServer;
 	private final Map<URI, List<String>> remoteServices;
+	private final Map<URI, BusMessageConnection> connectedServices;
 
 	public StandardBusServerMulticastDiscoveryClient(BusServer busServer,
 			Map<URI, List<String>> remoteServices) {
@@ -27,6 +32,7 @@ class StandardBusServerMulticastDiscoveryClient implements BusMessageConnection 
 		this.executor = Executors.newCachedThreadPool();
 		this.busServer = busServer;
 		this.remoteServices = remoteServices;
+		this.connectedServices = new HashMap<URI, BusMessageConnection>();
 	}
 
 	@Override
@@ -84,15 +90,25 @@ class StandardBusServerMulticastDiscoveryClient implements BusMessageConnection 
 		}
 	}
 
-	private void connect(URI serviceAddress) throws IOException {
-		StandardSocketBusMessageConnection conn = new StandardSocketBusMessageConnection(
-				serviceAddress);
-		busServer.addConnection(conn);
+	private void connect(final URI serviceAddress) throws IOException {
+		if (!connectedServices.containsKey(serviceAddress)) {
+			StandardSocketBusMessageConnection conn = new StandardSocketBusMessageConnection(
+					serviceAddress);
+			busServer.addConnection(conn);
+			logger.info("Discovered service at " + serviceAddress.toString());
+			connectedServices.put(serviceAddress, conn);
+			conn.addCloseHook(new Closeable() {
+				@Override
+				public void close() throws IOException {
+					connectedServices.remove(serviceAddress);
+					logger.info("Disconnected from service at " + serviceAddress.toString());
+				}
+			});
+		}
 	}
 
 	@Override
 	public void push(BusMessage msg) throws IOException {
-
 	}
 
 	@Override

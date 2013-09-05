@@ -12,10 +12,12 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.logging.Logger;
 
 import javax.net.ssl.SSLServerSocketFactory;
 
 class StandardSocketServerBusMessageConnection implements BusMessageConnection {
+	private final Logger logger = Logger.getLogger(getClass().getName());
 	private final URI localServiceUri;
 	private final ServerSocket server;
 	private final ExecutorService executor;
@@ -56,7 +58,8 @@ class StandardSocketServerBusMessageConnection implements BusMessageConnection {
 	public void start() throws IOException {
 		this.server.bind(new InetSocketAddress(localServiceUri.getHost(),
 				localServiceUri.getPort()));
-
+		logger.info(String.format("Binding service at %s", localServiceUri));
+		
 		executor.submit(new Callable<Void>() {
 			@Override
 			public Void call() throws Exception {
