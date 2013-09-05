@@ -25,7 +25,8 @@ class StandardBusServerMulticastDiscoveryClient implements BusMessageConnection 
 	private final BusServer busServer;
 	private final Map<URI, List<String>> remoteServices;
 	private final Map<URI, BusMessageConnection> connectedServices;
-
+	private MulticastSocket socket;
+	
 	public StandardBusServerMulticastDiscoveryClient(BusServer busServer,
 			Map<URI, List<String>> remoteServices) {
 		super();
@@ -43,7 +44,7 @@ class StandardBusServerMulticastDiscoveryClient implements BusMessageConnection 
 			final List<String> servicesAtThisAddress = remoteServiceEntry
 					.getValue();
 
-			final MulticastSocket socket = new MulticastSocket(
+			socket = new MulticastSocket(
 					discoveryAddress.getPort());
 			socket.setSoTimeout(1000);
 			InetAddress discoveryAddr = InetAddress
@@ -123,6 +124,9 @@ class StandardBusServerMulticastDiscoveryClient implements BusMessageConnection 
 
 	@Override
 	public void close() throws IOException {
+		if (socket != null) {
+			socket.close();
+		}
 		if (executor != null) {
 			executor.shutdownNow();
 		}
