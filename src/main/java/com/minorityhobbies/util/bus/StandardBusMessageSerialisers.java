@@ -1,7 +1,7 @@
 package com.minorityhobbies.util.bus;
 
 public enum StandardBusMessageSerialisers {
-	STANDARD(new StandardBusMessageSerialiser());
+	STANDARD(new StandardBusMessageSerialiser()), AES(new StandardBusMessageSerialiserAES());
 	
 	private final BusMessageSerialiser serialiser;
 	
