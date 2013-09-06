@@ -21,7 +21,7 @@ class StandardSocketServerBusMessageConnection implements BusMessageConnection {
 	private final URI localServiceUri;
 	private final ServerSocket server;
 	private final ExecutorService executor;
-	private final StandardBusMessageSerialiser serialiser = new StandardBusMessageSerialiser();
+	private final BusMessageSerialiser serialiser = new StandardBusMessageSerialiser();
 	private final Map<Socket, Socket> connections = new ConcurrentHashMap<Socket, Socket>();
 	private final Map<BusMessageSubscription, BusMessageHandler> subscriptions = new ConcurrentHashMap<BusMessageSubscription, BusMessageHandler>();
 

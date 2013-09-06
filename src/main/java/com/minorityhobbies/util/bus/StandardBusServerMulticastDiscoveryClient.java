@@ -23,16 +23,18 @@ class StandardBusServerMulticastDiscoveryClient implements BusMessageConnection 
 	private final Logger logger = Logger.getLogger(getClass().getName());
 	private final ExecutorService executor;
 	private final BusServer busServer;
+	private final BusMessageSerialiser serialiser;
 	private final Map<URI, List<String>> remoteServices;
 	private final Map<URI, BusMessageConnection> connectedServices;
 	private MulticastSocket socket;
 	
 	public StandardBusServerMulticastDiscoveryClient(BusServer busServer,
-			Map<URI, List<String>> remoteServices) {
+			Map<URI, List<String>> remoteServices, BusMessageSerialiser serialiser) {
 		super();
 		this.executor = Executors.newCachedThreadPool();
 		this.busServer = busServer;
 		this.remoteServices = remoteServices;
+		this.serialiser = serialiser;
 		this.connectedServices = new HashMap<URI, BusMessageConnection>();
 	}
 
@@ -55,8 +57,6 @@ class StandardBusServerMulticastDiscoveryClient implements BusMessageConnection 
 				@Override
 				public Void call() throws Exception {
 					try {
-						StandardBusMessageSerialiser serialiser = new StandardBusMessageSerialiser();
-
 						byte[] b = new byte[1024];
 						while (!Thread.currentThread().isInterrupted()) {
 							DatagramPacket p = new DatagramPacket(b, b.length);
@@ -71,11 +71,12 @@ class StandardBusServerMulticastDiscoveryClient implements BusMessageConnection 
 								if ("DISCOVERY".equals(type)) {
 									String serviceName = SOURCE
 											.get(discoveryMessage);
+									String protocol = discoveryMessage.get("_protocol");
 									if (servicesAtThisAddress
 											.contains(serviceName)) {
 										String address = discoveryMessage
 												.get("address");
-										connect(new URI(address));
+										connect(new URI(address), protocol);
 									}
 								}
 							} catch (SocketTimeoutException e) {
@@ -91,10 +92,14 @@ class StandardBusServerMulticastDiscoveryClient implements BusMessageConnection 
 		}
 	}
 
-	private void connect(final URI serviceAddress) throws IOException {
+	private void connect(final URI serviceAddress, String protocol) throws IOException {
 		if (!connectedServices.containsKey(serviceAddress)) {
+			if (protocol == null) {
+				throw new IOException(String.format("No serialiser for protocol '%s'", protocol));
+			}
+			BusMessageSerialiser serialiser = StandardBusMessageSerialisers.valueOf(protocol).get();
 			StandardSocketBusMessageConnection conn = new StandardSocketBusMessageConnection(
-					serviceAddress);
+					serviceAddress, serialiser);
 			busServer.addConnection(conn);
 			logger.info("Discovered service at " + serviceAddress.toString());
 			connectedServices.put(serviceAddress, conn);

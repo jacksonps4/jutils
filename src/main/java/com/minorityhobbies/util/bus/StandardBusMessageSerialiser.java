@@ -7,10 +7,13 @@ import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
 
-class StandardBusMessageSerialiser {
+class StandardBusMessageSerialiser implements BusMessageSerialiser {
+	@Override
 	public byte[] toBytes(BusMessage msg) throws IOException {
 		StringBuilder serialForm = new StringBuilder();
-		for (Map.Entry<String, String> entry : msg.getAttributes().entrySet()) {
+		Map<String, String> attribs = msg.getAttributes();
+		attribs.put("_protocol", StandardBusMessageSerialisers.STANDARD.toString());
+		for (Map.Entry<String, String> entry : attribs.entrySet()) {
 			String key = entry.getKey();
 			String value = entry.getValue();
 			serialForm.append(String.format("%s%s%s%n", key, '\u0003', value));
@@ -19,6 +22,7 @@ class StandardBusMessageSerialiser {
 		return serialForm.toString().getBytes(Charset.forName("UTF-8"));
 	}
 	
+	@Override
 	public BusMessage fromBytes(byte[] msg) throws IOException {
 		BufferedReader reader = null;
 		try {

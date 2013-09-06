@@ -16,6 +16,7 @@ public class BusServerFactory {
 	private URI localServiceUri;
 	private String serviceName;
 	private URI discoveryAddress;
+	private String protocol = "STANDARD";
 
 	public BusServerFactory() {
 		this.remoteEndpoints = new LinkedList<URI>();
@@ -74,13 +75,22 @@ public class BusServerFactory {
 			remoteServices.put(discoveryAddress, services);
 		}
 		services.add(serviceName);
-		
+
+		return this;
+	}
+
+	public BusServerFactory withProtocol(String protocol) {
+		this.protocol = protocol;
 		return this;
 	}
 
 	public Bus build() throws IOException {
 		StandardBus bus = new StandardBus();
 		BusServer server = bus.getBusServer();
+
+		BusMessageSerialiser serialiser = StandardBusMessageSerialisers
+				.valueOf(protocol).get();
+
 		if (localServiceUri != null) {
 			server.addConnection(new StandardSocketServerBusMessageConnection(
 					localServiceUri));
@@ -88,20 +98,21 @@ public class BusServerFactory {
 			// is it discoverable?
 			if (serviceName != null) {
 				StandardBusServerMulticastDiscovery discovery;
-				discovery = new StandardBusServerMulticastDiscovery(serviceName, 
-						localServiceUri, discoveryAddress);
+				discovery = new StandardBusServerMulticastDiscovery(
+						serviceName, localServiceUri, discoveryAddress,
+						serialiser);
 				server.addConnection(discovery);
 			}
 		}
-		
+
 		for (URI remoteEndpoint : remoteEndpoints) {
 			server.addConnection(new StandardSocketBusMessageConnection(
-					remoteEndpoint));
+					remoteEndpoint, serialiser));
 		}
 
 		if (remoteServices != null && remoteServices.size() > 0) {
-			StandardBusServerMulticastDiscoveryClient discoveryClient = new StandardBusServerMulticastDiscoveryClient(server, 
-					remoteServices);
+			StandardBusServerMulticastDiscoveryClient discoveryClient = new StandardBusServerMulticastDiscoveryClient(
+					server, remoteServices, serialiser);
 			server.addConnection(discoveryClient);
 		}
 

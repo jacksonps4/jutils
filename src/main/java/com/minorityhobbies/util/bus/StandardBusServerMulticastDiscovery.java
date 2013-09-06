@@ -12,7 +12,7 @@ import java.util.concurrent.Executors;
 class StandardBusServerMulticastDiscovery implements Callable<Void>,
 		BusMessageConnection {
 	private final ExecutorService executor;
-	private final StandardBusMessageSerialiser serialiser;
+	private final BusMessageSerialiser serialiser;
 	private final String serviceName;
 	private final URI serviceUri;
 	private final URI discoveryAddress;
@@ -20,10 +20,10 @@ class StandardBusServerMulticastDiscovery implements Callable<Void>,
 	private MulticastSocket socket;
 
 	public StandardBusServerMulticastDiscovery(String serviceName,
-			URI serviceUri, URI discoveryAddress) {
+			URI serviceUri, URI discoveryAddress, BusMessageSerialiser serialiser) {
 		super();
 		this.executor = Executors.newSingleThreadExecutor();
-		this.serialiser = new StandardBusMessageSerialiser();
+		this.serialiser = serialiser;
 		this.serviceName = serviceName;
 		this.discoveryAddress = discoveryAddress;
 		this.serviceUri = serviceUri;

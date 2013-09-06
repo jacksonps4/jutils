@@ -17,24 +17,25 @@ import java.util.concurrent.Executors;
 import javax.net.ssl.SSLSocketFactory;
 
 class StandardSocketBusMessageConnection implements BusMessageConnection {
-	private final StandardBusMessageSerialiser serialiser = new StandardBusMessageSerialiser();
 	private final Map<BusMessageSubscription, BusMessageHandler> subscriptions = new ConcurrentHashMap<BusMessageSubscription, BusMessageHandler>();
 	private final ExecutorService executor;
 	private final List<Closeable> closeHooks;
+	private final BusMessageSerialiser serialiser;
 	private Socket socket;
 	private DataInputStream in;
 	private DataOutputStream out;
 	private URI uri;
 	
-	public StandardSocketBusMessageConnection(URI uri) throws IOException {
+	public StandardSocketBusMessageConnection(URI uri, BusMessageSerialiser serialiser) throws IOException {
 		this.uri = uri;
 		this.executor = Executors.newSingleThreadExecutor();
 		this.closeHooks = new LinkedList<Closeable>();
+		this.serialiser = serialiser;
 	}
 
-	public StandardSocketBusMessageConnection(String hostname, int port)
+	public StandardSocketBusMessageConnection(String hostname, int port, BusMessageSerialiser serialiser)
 			throws IOException, URISyntaxException {
-		this(new URI(String.format("socket://%s:%d", hostname, port)));
+		this(new URI(String.format("socket://%s:%d", hostname, port)), serialiser);
 	}
 
 	@Override

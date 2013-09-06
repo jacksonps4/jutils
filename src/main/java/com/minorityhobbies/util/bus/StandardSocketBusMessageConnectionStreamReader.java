@@ -8,11 +8,11 @@ import java.util.concurrent.Callable;
 
 final class StandardSocketBusMessageConnectionStreamReader implements Callable<Void> {
 	private final InputStream in;
-	private final StandardBusMessageSerialiser serialiser;
+	private final BusMessageSerialiser serialiser;
 	private final BusMessageHandler handler;
 	
 	public StandardSocketBusMessageConnectionStreamReader(InputStream in,
-			StandardBusMessageSerialiser serialiser, BusMessageHandler handler) {
+			BusMessageSerialiser serialiser, BusMessageHandler handler) {
 		super();
 		this.in = in;
 		this.serialiser = serialiser;
