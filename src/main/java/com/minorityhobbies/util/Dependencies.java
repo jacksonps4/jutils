@@ -281,7 +281,7 @@ public class Dependencies implements Closeable {
 	 * Finds the specified dependency by firstly searching through the
 	 * singletons container, then the getter methods of root modules (those
 	 * passed into the constructor of {@link Dependencies}), then the getter
-	 * methods of any other modules.
+	 * methods of any other modules and finally, the service loader.
 	 * 
 	 * @param type
 	 *            The type of the required dependency.
@@ -310,11 +310,20 @@ public class Dependencies implements Closeable {
 				}
 			}
 		}
-		// finally the subclass getter methods
+		// then the subclass getter methods
 		if (result == null) {
 			result = findDependency(getClass(), this, type);
 		}
 
+		// finally, the ServiceLoader
+		if (result == null) {
+			ServiceLoader<T> serviceLoader = ServiceLoader.load(type);
+			Iterator<T> itr = serviceLoader.iterator();
+			if (itr.hasNext()) {
+				result = itr.next();
+			}
+		}
+		
 		if (result == null) {
 			throw new DependencyException(String.format(
 					"Dependency of type %s not found", type.getName()));
