@@ -59,4 +59,9 @@ public class URLPatternFactory implements Iterable<URL>, Iterator<URL> {
 			throw new RuntimeException(e);
 		}
 	}
+
+	@Override
+	public void remove() {
+		throw new UnsupportedOperationException();
+	}
 }
