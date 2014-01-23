@@ -14,6 +14,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -141,5 +142,30 @@ public class CollectionUtils {
 			}
 		}
 		return true;
+	}
+	
+	/**
+	 * Creates a {@link Properties} object containing the key value pairs
+	 * specified in order as parameters.
+	 * 
+	 * @param values
+	 *            The key value pairs to use to create the {@link Properties}
+	 *            object.
+	 * @return The built {@link Properties} instance.
+	 */
+	public static Properties newProperties(String... values) {
+		if ((values.length % 2) != 0) {
+			throw new IllegalArgumentException(
+					"Must specify an even number of key value pairs.");
+		}
+
+		Properties properties = new Properties();
+		for (int i = 0; i < values.length; i += 2) {
+			String key = values[i];
+			String value = values[i + 1];
+			properties.setProperty(key, value);
+		}
+
+		return properties;
 	}
 }
