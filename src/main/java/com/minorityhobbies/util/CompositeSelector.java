@@ -9,49 +9,23 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 */
 package com.minorityhobbies.util;
 
-import java.util.LinkedList;
 import java.util.List;
 
-public class StringUtils {
-	private StringUtils() {}
-	
-	public static String generateRandomPayload(int length) {
-		StringBuilder random = new StringBuilder();
-		for (int i = 0; i < length; i++) {
-			int chr = (int) (Math.random() * 26) + 65;
-			boolean uppercase = Math.random() >= 0.5 ? true : false;
-			if (uppercase) {
-				chr = chr + 32;
-			}
-			random.append((char) chr);
-		}
-		return random.toString();
+public class CompositeSelector<T> extends Selector<T> {
+	private final List<Selector<T>> selectors;
+
+	public CompositeSelector(List<Selector<T>> selectors) {
+		super();
+		this.selectors = selectors;
 	}
-	
-	public static String[] splitQuoted(String data, char delimiter) {
-		boolean inDoubleQuotes = false;
-		
-		List<String> fields = new LinkedList<String>();
-		StringBuilder field = new StringBuilder();
-		for (int i = 0; i < data.length(); i++) {
-			char c = data.charAt(i);
-			if (c == '"') {
-				inDoubleQuotes = !inDoubleQuotes;
-			} else if (c == delimiter) {
-				if (!inDoubleQuotes) {
-					fields.add(field.toString());
-					field = new StringBuilder();
-				} else {
-					field.append(c);
-				}
-			} else {
-				field.append(c);
+
+	@Override
+	public boolean select(T val) {
+		for (Selector<T> selector : selectors) {
+			if (!selector.select(val)) {
+				return false;
 			}
 		}
-		if (!inDoubleQuotes) {
-			fields.add(field.toString());
-		} 
-		
-		return fields.toArray(new String[fields.size()]);
+		return true;
 	}
 }

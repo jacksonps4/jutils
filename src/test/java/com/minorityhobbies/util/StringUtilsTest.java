@@ -26,4 +26,17 @@ public class StringUtilsTest {
 		Matcher matcher = ALPHA_ONLY.matcher(payload);
 		assertTrue(matcher.matches());
 	}
+	
+	@Test
+	public void testSplitWithQuotes() {
+		String[] fields = StringUtils.splitQuoted("12 Jan 13,\" The Star Inn, Harome \",MR C WRAITH,Entertainment,,120.00", ',');
+		assertEquals(6, fields.length);
+		
+		assertEquals("12 Jan 13", fields[0]);
+		assertEquals(" The Star Inn, Harome ", fields[1]);
+		assertEquals("MR C WRAITH", fields[2]);
+		assertEquals("Entertainment", fields[3]);
+		assertEquals("", fields[4]);
+		assertEquals("120.00", fields[5]);
+	}
 }
