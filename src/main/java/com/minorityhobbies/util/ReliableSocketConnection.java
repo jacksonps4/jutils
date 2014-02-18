@@ -154,6 +154,17 @@ public class ReliableSocketConnection implements Flushable, Closeable {
 		}
 	}
 
+	public void write(final int b) {
+		useSocketReliably(new SocketAction() {
+			@Override
+			public void doAction(InputStream in, OutputStream out) throws IOException {
+				synchronized (this) {
+					out.write(b);
+				}				
+			}
+		});
+	}
+	
 	public void write(final byte[] b, final int offset, final int length) {
 		useSocketReliably(new SocketAction() {
 			@Override
