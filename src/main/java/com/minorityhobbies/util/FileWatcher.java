@@ -32,9 +32,20 @@ public class FileWatcher implements Runnable {
 
 	private final FilenameFilter defaultFilter;
 	private FilenameFilter filter;
-	private Map<File, Long> cache = new HashMap<File, Long>();
+	private Map<File, FileAttributes> cache = new HashMap<File, FileAttributes>();
 	private Set<File> processed = new HashSet<File>();
 
+	private static final class FileAttributes {
+		final Long size;
+		final Long lastModified;
+		
+		public FileAttributes(Long size, Long lastModified) {
+			super();
+			this.size = size;
+			this.lastModified = lastModified;
+		}
+	}
+	
 	public FileWatcher(String directory, FileListener listener) {
 		this.directory = new File(directory);
 		if (!this.directory.exists()) {
@@ -62,13 +73,14 @@ public class FileWatcher implements Runnable {
 			if (cache.size() > 0) {
 				for (File file : files) {
 					if (cache.containsKey(file)) {
-						Long cachedFileSize = cache.get(file);
-						if (cachedFileSize.longValue() == file.length()
+						FileAttributes cachedFileAttr = cache.get(file);
+						if (cachedFileAttr.size == file.length()
+								&& cachedFileAttr.lastModified == file.lastModified()
 								&& !processed.contains(file)) {
 							try {
 								logger.info(String.format("Processing file '%s'", file.getAbsolutePath()));
-								fileListener.processFile(file);
 								processed.add(file);
+								fileListener.processFile(file);
 							} catch (Throwable t) {
 								logger.severe(String.format(
 										"Error processing file '%s': %s", file, t.getMessage()));
@@ -78,9 +90,9 @@ public class FileWatcher implements Runnable {
 				}
 			}
 
-			cache = new HashMap<File, Long>();
+			cache = new HashMap<File, FileAttributes>();
 			for (File file : files) {
-				cache.put(file, file.length());
+				cache.put(file, new FileAttributes(file.length(), file.lastModified()));
 			}
 			try {
 				Thread.sleep(5000L);
