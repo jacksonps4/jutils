@@ -15,6 +15,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -165,13 +166,17 @@ public class JDBCUtils {
 		return DriverManager.getConnection(connDetails.getJdbcUrl(), cprops);
 	}
 
-	public static <T> T executeUniqueQuery(Connection conn, String sql, Closure<ResultSet, T> mapper) {
-		Statement stmt = null;
+	public static <T> T executeUniqueQuery(Connection conn, String sql, Closure<ResultSet, T> mapper, Object... params) {
+		PreparedStatement stmt = null;
 		try {
-			stmt = conn.createStatement();
+			stmt = conn.prepareStatement(sql);
+			for (int i = 0; i < params.length; i++) {
+				stmt.setObject(i+1, params[i]);
+			}
+
 			ResultSet rs = null;
 			try {
-				rs = stmt.executeQuery(sql);
+				rs = stmt.executeQuery();
 				T result = null;
 				while (rs.next()) {
 					result = mapper.invoke(rs);
@@ -194,14 +199,18 @@ public class JDBCUtils {
 	}
 	
 	public static <T> List<T> executeQuery(Connection conn, String sql,
-			Closure<ResultSet, T> mapper) {
+			Closure<ResultSet, T> mapper, Object... params) {
 		List<T> results = new LinkedList<T>();
-		Statement stmt = null;
+		PreparedStatement stmt = null;
 		try {
-			stmt = conn.createStatement();
+			stmt = conn.prepareStatement(sql);
+			for (int i = 0; i < params.length; i++) {
+				stmt.setObject(i+1, params[i]);
+			}
+			
 			ResultSet rs = null;
 			try {
-				rs = stmt.executeQuery(sql);
+				rs = stmt.executeQuery();
 				while (rs.next()) {
 					results.add(mapper.invoke(rs));
 				}
@@ -219,12 +228,16 @@ public class JDBCUtils {
 		return results;
 	}
 
-	public static int executeSingleUpdate(Connection conn, String sql) {
-		Statement stmt = null;
+	public static int executeSingleUpdate(Connection conn, String sql, Object... params) {
+		PreparedStatement stmt = null;
 		try {
-			stmt = conn.createStatement();
+			stmt = conn.prepareStatement(sql);
+			for (int i = 0; i < params.length; i++) {
+				stmt.setObject(i+1, params[i]);
+			}
+			
 			try {
-				return stmt.executeUpdate(sql);
+				return stmt.executeUpdate();
 			} finally {
 				if (stmt != null) {
 					stmt.close();
@@ -254,6 +267,22 @@ public class JDBCUtils {
 		}
 	}
 
+	public static boolean execute(Connection conn, String sql) {
+		Statement stmt = null;
+		try {
+			stmt = conn.createStatement();
+			try {
+				return stmt.execute(sql);
+			} finally {
+				if (stmt != null) {
+					stmt.close();
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
 	public static String convertDate(Calendar date) {
 		return convertDate(date.getTime());
 	}
@@ -272,5 +301,16 @@ public class JDBCUtils {
 	
 	public static String convertBoolean(boolean val) {
 		return val ? "1" : "0";
+	}
+	
+	public static <T> SQLResultSetMapper<T> newSingleResultMapper() {
+		return new SQLResultSetMapper<T>() {
+			@Override
+			protected T map(ResultSet val) throws SQLException {
+				@SuppressWarnings("unchecked")
+				T result = (T) val.getObject(1);
+				return result;
+			}
+		};
 	}
 }

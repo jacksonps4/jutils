@@ -2,6 +2,7 @@ package com.minorityhobbies.util;
 
 import static org.junit.Assert.assertEquals;
 
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -69,19 +70,19 @@ public class URLPatternFactoryTest {
 	}
 	
 	@Test
-	public void documentationTestCase() {
-		URLPatternFactory upf = new URLPatternFactory("http://www.java.com/data-%n", Arrays.asList(1, 2, 3));
+	public void documentationTestCase() throws MalformedURLException {
+		URLPatternFactory upf = new URLPatternFactory("http://www.java.com/data-%d", Arrays.asList(1, 2, 3));
 		int count = 0;
 		for (URL url : upf) {
-			switch (count) {
+			switch (count++) {
 			case 0:
-				assertEquals("http://www.java.com/data-1", url);
+				assertEquals(new URL("http://www.java.com/data-1"), url);
 				break;
 			case 1:
-				assertEquals("http://www.java.com/data-2", url);
+				assertEquals(new URL("http://www.java.com/data-2"), url);
 				break;
 			case 2:
-				assertEquals("http://www.java.com/data-3", url);
+				assertEquals(new URL("http://www.java.com/data-3"), url);
 				break;
 			}
 		}

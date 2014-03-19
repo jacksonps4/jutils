@@ -1,3 +1,12 @@
+/*
+Copyright (c) 2014 Chris Wraith
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
 package com.minorityhobbies.util;
 
 import java.io.ByteArrayInputStream;
@@ -27,7 +36,8 @@ import java.util.Map;
 public class PropertiesObjectRepository {
 	private final FileInputStream in;
 	private final FileOutputStream out;
-	private final FileChannel fc;
+	private final FileChannel fcIn;
+	private final FileChannel fcOut;
 	private final Map<String, ObjectRecord> index = new HashMap<String, ObjectRecord>();
 
 	private static final class ObjectRecord {
@@ -43,7 +53,8 @@ public class PropertiesObjectRepository {
 		super();
 		this.in = new FileInputStream(repository);
 		this.out = new FileOutputStream(repository);
-		this.fc = in.getChannel();
+		this.fcIn = in.getChannel();
+		this.fcOut = out.getChannel();
 		createIndex();
 	}
 
@@ -51,9 +62,12 @@ public class PropertiesObjectRepository {
 		long recordStart = 0;
 		DataInputStream data = new DataInputStream(in);
 		try {
-			recordStart = fc.position();
+			recordStart = fcIn.position();
 			String key = data.readUTF();
 			int payloadLength = data.readInt();
+			if (payloadLength == -1) {
+				payloadLength = data.readInt();
+			}
 			
 			byte[] b = new byte[payloadLength];
 			data.readFully(b);
@@ -64,16 +78,16 @@ public class PropertiesObjectRepository {
 		}
 	}
 
-	<T> T retrieve(String key, Class<T> type) throws IOException {
+	public <T> T retrieve(String key, Class<T> type) throws IOException {
 		ObjectRecord indexEntry = index.get(key);
-		fc.position(indexEntry.startPosition);
-
-		DataInputStream d = new DataInputStream(in);
-		String keyRead = d.readUTF();
-		if (!keyRead.equals(key)) {
-			throw new IllegalStateException(String.format("Database corrupted: expected key = '%s' but found '%s'", key, keyRead));
+		if (indexEntry == null) {
+			return null;
 		}
 		
+		fcIn.position(indexEntry.startPosition);
+
+		readKey(key);
+		DataInputStream d = new DataInputStream(in);
 		int length = d.readInt(); 
 		byte[] b = new byte[length];
 		d.readFully(b);
@@ -88,7 +102,16 @@ public class PropertiesObjectRepository {
 		}
 	}
 
-	void store(String key, Object obj) throws IOException {
+	private String readKey(String key) throws IOException {
+		DataInputStream d = new DataInputStream(in);
+		String keyRead = d.readUTF();
+		if (!keyRead.equals(key)) {
+			throw new IllegalStateException(String.format("Database corrupted: expected key = '%s' but found '%s'", key, keyRead));
+		}
+		return keyRead;
+	}
+
+	public void store(String key, Object obj) throws IOException {
 		ByteArrayOutputStream rawObject = new ByteArrayOutputStream();
 		ObjectOutputStream oos = new ObjectOutputStream(rawObject);
 		oos.writeObject(obj);
@@ -105,16 +128,35 @@ public class PropertiesObjectRepository {
 		byte[] rawObjEntry = rawEntry.toByteArray();
 		
 		// move to end of file
-		fc.position(fc.size());
+		fcOut.position(fcOut.size());
 		out.write(rawObjEntry);
 		out.flush();
 
-		long endPosition = fc.size() - 1;
+		long endPosition = fcOut.size() - 1;
 		long startPosition = endPosition - rawObjEntry.length + 1;
 		index.put(key, new ObjectRecord(startPosition));
 	}
 
-	void set(String key, String value) throws IOException {
-		
+	public boolean remove(String key) throws IOException {
+		ObjectRecord indexEntry = index.get(key);
+		if (indexEntry != null) {
+			fcIn.position(indexEntry.startPosition);
+			
+			readKey(key);
+			DataInputStream d = new DataInputStream(in);
+			int size = d.readInt();
+			DataOutputStream o = new DataOutputStream(out);
+			fcOut.position(fcIn.position() - 4);
+			
+			o.writeInt(-1);
+			o.writeInt(size - 4);
+			o.flush();
+			
+			index.remove(key);
+			
+			return true;
+		} else {
+			return false;
+		}
 	}
 }

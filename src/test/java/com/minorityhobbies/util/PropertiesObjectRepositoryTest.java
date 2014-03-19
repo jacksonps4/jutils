@@ -1,6 +1,7 @@
 package com.minorityhobbies.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -53,5 +54,11 @@ public class PropertiesObjectRepositoryTest {
 		}
 		
 		System.out.printf("Random retrieval averages %fms%n", (total / (100000.0 * 1000000.0)));
+	}
+	
+	@Test
+	public void testRemove() throws IOException {
+		assertTrue(repository.remove("someKey"));
+		assertNull(repository.retrieve("someKey", String.class));
 	}
 }

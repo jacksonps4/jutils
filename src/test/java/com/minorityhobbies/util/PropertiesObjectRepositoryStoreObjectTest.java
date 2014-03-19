@@ -1,6 +1,8 @@
 package com.minorityhobbies.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -18,6 +20,10 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import sun.misc.BASE64Decoder;
+import sun.misc.BASE64Encoder;
+
+@SuppressWarnings("restriction")
 public class PropertiesObjectRepositoryStoreObjectTest {
 	private File location;
 	private PropertiesObjectRepository repository;
@@ -68,6 +74,10 @@ public class PropertiesObjectRepositoryStoreObjectTest {
 
 		Simple3DPoint q = new Simple3DPoint(5, 10, 15);
 		repository.store("q", q);
+		
+		Simple3DPoint r = new Simple3DPoint(7, 14, 21);
+		repository.store("r", r);
+
 	}
 
 	@After
@@ -80,9 +90,11 @@ public class PropertiesObjectRepositoryStoreObjectTest {
 			ClassNotFoundException {
 		Properties props = readProperties();
 		String raw = props.getProperty("p");
-		ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(
-				raw.getBytes()));
-		SimplePoint p = (SimplePoint) in.readObject();
+		
+		BASE64Decoder dec = new BASE64Decoder();
+		byte[] b = dec.decodeBuffer(raw);
+		ObjectInputStream oin = new ObjectInputStream(new ByteArrayInputStream(b));
+		SimplePoint p = (SimplePoint) oin.readObject();
 		assertEquals(100, p.getX());
 		assertEquals(250, p.getY());
 	}
@@ -92,12 +104,31 @@ public class PropertiesObjectRepositoryStoreObjectTest {
 			ClassNotFoundException {
 		Properties props = readProperties();
 		String raw = props.getProperty("q");
+		
+		BASE64Decoder dec = new BASE64Decoder();
+		byte[] b = dec.decodeBuffer(raw);
+
 		ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(
-				raw.getBytes()));
+				b));
 		Simple3DPoint p = (Simple3DPoint) in.readObject();
 		assertEquals(5, p.getX());
 		assertEquals(10, p.getY());
 		assertEquals(15, p.getZ());
+	}
+
+	@Test
+	public void testRemoveFromMemoryIndex() throws IOException {
+		repository.remove("q");
+		assertNull(repository.retrieve("q", String.class));
+	}
+
+	@Test
+	public void testRemoveFromDisk() throws IOException {
+		assertNotNull(repository.retrieve("q", Simple3DPoint.class));
+		repository.remove("q");
+
+		repository = new PropertiesObjectRepository(location);
+		assertNull(repository.retrieve("q", Simple3DPoint.class));
 	}
 
 	private Properties readProperties() throws FileNotFoundException,
@@ -109,10 +140,14 @@ public class PropertiesObjectRepositoryStoreObjectTest {
 			while (!Thread.currentThread().isInterrupted()) {
 				String key = in.readUTF();
 				int length = in.readInt();
+				if (length == -1) {
+					length = in.readInt();
+				}
 				byte[] b = new byte[length];
 				in.readFully(b);
 
-				props.put(key, new String(b));
+				BASE64Encoder enc = new BASE64Encoder(); 
+				props.put(key, enc.encode(b));
 			}
 		} catch (EOFException e) {
 			// end of file
