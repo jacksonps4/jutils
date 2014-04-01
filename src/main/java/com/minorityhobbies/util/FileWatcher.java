@@ -83,7 +83,7 @@ public class FileWatcher implements Runnable {
 								fileListener.processFile(file);
 							} catch (Throwable t) {
 								logger.severe(String.format(
-										"Error processing file '%s': %s", file, t.getMessage()));
+										"Error processing file '%s': %s%n%s", file, t.getMessage(), ExceptionUtilities.getStackTraceAsString(t)));
 							}
 						}
 					}
