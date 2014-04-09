@@ -15,6 +15,7 @@ import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.io.Closeable;
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -34,11 +35,11 @@ import java.util.logging.Logger;
  * An application module represents a subsystem with a defined public API which
  * may be used without any knowledge of the internal implementation of that API.
  * 
- * To create an application module, simply extend this class and create a
- * constructor which takes in all of its required dependencies as parameters. A
- * module can expose dependencies that can be used by other modules simply by
- * implementing a getter method to return that dependency. This gives the module
- * creator complete control over the scope of each dependency.
+ * To create an application module, simply create a POJO with a constructor
+ * which takes in all of its required dependencies as parameters. A module can
+ * expose dependencies that can be used by other modules simply by implementing
+ * a getter method to return that dependency. This gives the module creator
+ * complete control over the scope of each dependency.
  * 
  * To bootstrap an application, create an instance of this class passing in any
  * singletons which are required by your modules as well as the module classes.
@@ -48,7 +49,7 @@ import java.util.logging.Logger;
  * 
  * Below is an example of how usage of this class is typically achieved: <code>
  *   // contains application dependencies
- *   public class ApplicationModule extends Dependencies {
+ *   public class ApplicationModule {
  *   	private final DataAccessObject dataModule;
  *   	private final AppServer appServer;
  *   
@@ -66,7 +67,7 @@ import java.util.logging.Logger;
  *   }
  *   
  *   // contains database dependencies
- *   public class DataModule extends Dependencies {
+ *   public class DataModule {
  *   	private final DataSource dataSource;
  *      private final DataAccessObject dao;
  *      
@@ -116,9 +117,8 @@ public class Dependencies implements Closeable {
 	private final Logger logger = Logger.getLogger(getClass().getName());
 
 	private final Map<Class<?>, Object> singletons = new HashMap<Class<?>, Object>();
-	private final Map<Class<?>, Method> dependencyLocator = new HashMap<Class<?>, Method>();
 	private final Class<?>[] moduleTypes;
-	private List<Dependencies> rootModules = new LinkedList<Dependencies>();
+	private List<Object> rootModules = new LinkedList<Object>();
 
 	public Dependencies(Object[] singletons, Class<?>... modules) {
 		super();
@@ -146,7 +146,10 @@ public class Dependencies implements Closeable {
 			return;
 		}
 
-		// create a map of all dependencies exposed by modules: type -> getter method 
+		Map<Class<?>, List<Method>> dependencyLocator = new HashMap<Class<?>, List<Method>>();
+
+		// create a map of all dependencies exposed by modules: type -> getter
+		// method
 		// this obviously doesn't include singletons
 		for (Class<?> moduleType : moduleTypes) {
 			BeanInfo bi = null;
@@ -154,14 +157,22 @@ public class Dependencies implements Closeable {
 				bi = Introspector.getBeanInfo(moduleType);
 				PropertyDescriptor[] properties = bi.getPropertyDescriptors();
 				for (PropertyDescriptor property : properties) {
+					Class<?> propertyType = property.getPropertyType();
+
 					Method getter = property.getReadMethod();
-					if (Class.class.equals(property.getPropertyType())) {
+					if (Class.class.equals(propertyType)) {
 						continue;
 					}
 					if (getter != null) {
-						dependencyLocator.put(property.getPropertyType(), getter);
+						List<Method> methods = null;
+						if ((methods = dependencyLocator.get(propertyType)) == null) {
+							methods = new LinkedList<Method>();
+							dependencyLocator.put(propertyType, methods);
+						}
+						methods.add(getter);
+
 						logger.info(String.format(
-								"Bound dependency of type %s => module %s",
+								"Found dependency of type %s in module %s",
 								property.getPropertyType(), moduleType));
 					}
 				}
@@ -170,7 +181,7 @@ public class Dependencies implements Closeable {
 			}
 		}
 
-		// for all modules, try to match the constructor parameters first to a 
+		// for all modules, try to match the constructor parameters first to a
 		// singleton dependency, then a dependency provided by another module
 		// and finally, to the ServiceLoader
 		for (Class<?> moduleType : moduleTypes) {
@@ -178,6 +189,10 @@ public class Dependencies implements Closeable {
 			for (Constructor<?> ctor : ctors) {
 				Class<?>[] parameterTypes = ctor.getParameterTypes();
 				Object[] parameterValues = new Object[parameterTypes.length];
+				Annotation[][] parameterAnnotations = ctor
+						.getParameterAnnotations();
+
+				// look for matching dependencies in singletons
 				int parametersFound = 0;
 				for (int i = 0; i < parameterTypes.length; i++) {
 					Class<?> parameterType = parameterTypes[i];
@@ -186,38 +201,75 @@ public class Dependencies implements Closeable {
 							parameterValues[i] = singletons.get(type);
 							logger.info(String
 									.format("Injecting singleton instance '%s' of type into constructor %s => %s",
-											parameterValues[i].getClass(), parameterType, moduleType));
+											parameterValues[i].getClass(),
+											parameterType, moduleType));
 							parametersFound++;
 							break;
 						}
 					}
 				}
-				
+
 				if (parametersFound < parameterValues.length) {
 					for (int i = 0; i < parameterValues.length; i++) {
 						if (parameterValues[i] != null) {
 							continue;
 						}
 						Class<?> requiredType = parameterTypes[i];
-						Method getter = dependencyLocator.get(requiredType);
-						if (getter == null) {
-							for (Dependencies d : rootModules) {
+						List<Class<? extends Annotation>> requiredAnnotations = new LinkedList<Class<? extends Annotation>>();
+						for (Annotation annotation : parameterAnnotations[i]) {
+							requiredAnnotations
+									.add(annotation.annotationType());
+						}
+
+						// for remaining parameters, check modules for matching
+						// dependencies
+						List<Method> getters = dependencyLocator
+								.get(requiredType);
+						if (getters == null) {
+							for (Object d : rootModules) {
 								if (requiredType.isAssignableFrom(d.getClass())) {
 									parameterValues[i] = d;
 									logger.info(String
 											.format("Injecting single dependency of type '%s' into constructor %s => %s",
-													parameterValues[i].getClass(), requiredType, moduleType));
+													parameterValues[i]
+															.getClass(),
+													requiredType, moduleType));
 									break;
 								}
 							}
 						} else {
-							for (Dependencies d : rootModules) {
-								if (getter.getDeclaringClass().equals(d.getClass())) {
+							Method getter = null;
+							if (requiredAnnotations.size() > 0) {
+								// must match getter annotations to
+								// constructor annotations
+								for (Method m : getters) {
+									for (Class<? extends Annotation> annotation : requiredAnnotations) {
+										if (m.isAnnotationPresent(annotation)) {
+											getter = m;
+											break;
+										}
+									}
+									if (getter != null) {
+										break;
+									}
+								}
+							} else if (getter == null
+									&& getters.size() == 1) {
+								getter = getters.get(0);
+							} else {
+								throw new DependencyException("Cannot find unique dependency"
+										+ "to inject of type " + requiredType);
+							}
+
+							for (Object d : rootModules) {
+								if (getter.getDeclaringClass().equals(
+										d.getClass())) {
 									try {
 										parameterValues[i] = getter.invoke(d);
 										logger.info(String
 												.format("Injecting dependency of type into constructor %s => %s",
-														requiredType, moduleType));
+														requiredType,
+														moduleType));
 										break;
 									} catch (Exception e) {
 										throw new DependencyException(e);
@@ -225,22 +277,25 @@ public class Dependencies implements Closeable {
 								}
 							}
 						}
-						
+
+						// if there are still parameters that are unmatched, try
+						// the ServiceLoader.
 						if (parameterValues[i] == null) {
-							ServiceLoader<?> serviceLoader = ServiceLoader.load(requiredType);
+							ServiceLoader<?> serviceLoader = ServiceLoader
+									.load(requiredType);
 							for (Object instance : serviceLoader) {
 								parameterValues[i] = instance;
 								logger.info(String
 										.format("Injecting dependency from service loader of type '%s' into constructor %s => %s",
-												parameterValues[i].getClass(), requiredType, moduleType));
+												parameterValues[i].getClass(),
+												requiredType, moduleType));
 								break;
 							}
 						}
 					}
 				}
 				try {
-					rootModules.add((Dependencies) ctor
-							.newInstance(parameterValues));
+					rootModules.add(ctor.newInstance(parameterValues));
 				} catch (Exception e) {
 					throw new DependencyException(e);
 				}
@@ -249,8 +304,9 @@ public class Dependencies implements Closeable {
 	}
 
 	/**
-	 * Calls the close() method on any singletons that implement {@link Closeable}
-	 * and then on any modules that implement {@link Closeable}.
+	 * Calls the close() method on any singletons that implement
+	 * {@link Closeable} and then on any modules that implement
+	 * {@link Closeable}.
 	 */
 	@Override
 	public final void close() {
@@ -291,9 +347,31 @@ public class Dependencies implements Closeable {
 	 *             exception is thrown while attempting to obtain an instance of
 	 *             it.
 	 */
-	@SuppressWarnings("unchecked")
 	public final <T> T resolveDependency(Class<T> type)
 			throws DependencyException {
+		return resolveDependency(type, null);
+	}
+
+	/**
+	 * Finds the specified dependency by firstly searching through the
+	 * singletons container, then the getter methods of root modules (those
+	 * passed into the constructor of {@link Dependencies}), then the getter
+	 * methods of any other modules and finally, the service loader.
+	 * 
+	 * @param type
+	 *            The type of the required dependency.
+	 * @param annotation
+	 *            The annotation present on the getter of the required
+	 *            dependency.
+	 * @return An instance of the required dependency type.
+	 * @throws DependencyException
+	 *             If the required dependency is not available or if an
+	 *             exception is thrown while attempting to obtain an instance of
+	 *             it.
+	 */
+	@SuppressWarnings("unchecked")
+	public final <T> T resolveDependency(Class<T> type,
+			Class<? extends Annotation> annotation) throws DependencyException {
 		T result = null;
 		// try the singletons container first
 		if (Object.class.equals(getClass().getSuperclass())) {
@@ -302,8 +380,9 @@ public class Dependencies implements Closeable {
 		// then the module bindings
 		if (result == null) {
 			if (rootModules != null) {
-				for (Dependencies dep : rootModules) {
-					result = findDependency(dep.getClass(), dep, type);
+				for (Object dep : rootModules) {
+					result = findDependency(dep.getClass(), dep, type,
+							annotation);
 					if (result != null) {
 						break;
 					}
@@ -312,7 +391,7 @@ public class Dependencies implements Closeable {
 		}
 		// then the subclass getter methods
 		if (result == null) {
-			result = findDependency(getClass(), this, type);
+			result = findDependency(getClass(), this, type, annotation);
 		}
 
 		// finally, the ServiceLoader
@@ -323,7 +402,7 @@ public class Dependencies implements Closeable {
 				result = itr.next();
 			}
 		}
-		
+
 		if (result == null) {
 			throw new DependencyException(String.format(
 					"Dependency of type %s not found", type.getName()));
@@ -346,9 +425,31 @@ public class Dependencies implements Closeable {
 	 *             exception is thrown while attempting to obtain an instance of
 	 *             it.
 	 */
-	@SuppressWarnings("unchecked")
 	public final <T> Collection<T> resolveDependencies(Class<T> type)
 			throws DependencyException {
+		return resolveDependencies(type, null);
+	}
+
+	/**
+	 * Finds the specified dependency by firstly searching through the
+	 * singletons container, then the getter methods of root modules (those
+	 * passed into the constructor of {@link Dependencies}), then the getter
+	 * methods of any other modules.
+	 * 
+	 * @param type
+	 *            The type of the required dependency.
+	 * @param annotation
+	 *            The annotation present on the method exposing the required
+	 *            dependency.
+	 * @return An instance of the required dependency type.
+	 * @throws DependencyException
+	 *             If the required dependency is not available or if an
+	 *             exception is thrown while attempting to obtain an instance of
+	 *             it.
+	 */
+	@SuppressWarnings("unchecked")
+	public final <T> Collection<T> resolveDependencies(Class<T> type,
+			Class<? extends Annotation> annotation) throws DependencyException {
 		List<T> results = new LinkedList<T>();
 		// try the singletons container first
 		if (Object.class.equals(getClass().getSuperclass())) {
@@ -357,38 +458,46 @@ public class Dependencies implements Closeable {
 				results.add(result);
 			}
 		}
-		
+
 		// then the module bindings
 		if (rootModules != null) {
-			for (Dependencies dep : rootModules) {
-				T result = findDependency(dep.getClass(), dep, type);
+			for (Object dep : rootModules) {
+				T result = findDependency(dep.getClass(), dep, type, annotation);
 				if (result != null) {
 					results.add(result);
 				}
 			}
 		}
-		
+
 		// finally the subclass getter methods
-		T result = findDependency(getClass(), this, type);
+		T result = findDependency(getClass(), this, type, annotation);
 		if (result != null) {
 			results.add(result);
 		}
 
 		return results;
 	}
-	
+
 	final <T> T findDependency(Class<?> dependenciesClass, Object instance,
-			Class<T> dependencyType) throws DependencyException {
-		Collection<T> deps = findDependencies(dependenciesClass, instance, dependencyType);
+			Class<T> dependencyType, Class<? extends Annotation> annotation)
+			throws DependencyException {
+		Collection<T> deps = findDependencies(dependenciesClass, instance,
+				dependencyType, annotation);
+		if (deps.size() > 1) {
+			throw new DependencyException(
+					String.format("More than one dependency of type %s was found. "
+							+ "Please annotate the getter to select the appropriate instance."));
+		}
 		Iterator<T> itr = deps.iterator();
 		if (itr.hasNext()) {
 			return itr.next();
 		}
 		return null;
 	}
-	
-	final <T> Collection<T> findDependencies(Class<?> dependenciesClass, Object instance,
-			Class<T> dependencyType) throws DependencyException {
+
+	final <T> Collection<T> findDependencies(Class<?> dependenciesClass,
+			Object instance, Class<T> dependencyType,
+			Class<? extends Annotation> annotation) throws DependencyException {
 		BeanInfo bi;
 		try {
 			bi = Introspector.getBeanInfo(dependenciesClass);
@@ -396,9 +505,13 @@ public class Dependencies implements Closeable {
 			for (PropertyDescriptor pd : bi.getPropertyDescriptors()) {
 				if (dependencyType.isAssignableFrom(pd.getPropertyType())) {
 					Method getter = pd.getReadMethod();
-					@SuppressWarnings("unchecked")
-					T dependency = (T) getter.invoke(instance);
-					deps.add(dependency);
+					if (annotation != null
+							&& getter.isAnnotationPresent(annotation)
+							|| annotation == null) {
+						@SuppressWarnings("unchecked")
+						T dependency = (T) getter.invoke(instance);
+						deps.add(dependency);
+					}
 				}
 			}
 
