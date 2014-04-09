@@ -20,6 +20,8 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -120,16 +122,20 @@ public class Dependencies implements Closeable {
 	private final Class<?>[] moduleTypes;
 	private List<Object> rootModules = new LinkedList<Object>();
 
+	public Dependencies(Object[] singletons) {
+		this(singletons, new Class<?>[0]);
+	}
+
+	public Dependencies(Class<?>... modules) {
+		this(new Object[0], modules);
+	}
+
 	public Dependencies(Object[] singletons, Class<?>... modules) {
 		super();
 		this.moduleTypes = modules;
 		for (Object o : singletons) {
 			this.singletons.put(o.getClass(), o);
 		}
-	}
-
-	protected Dependencies() {
-		moduleTypes = null;
 	}
 
 	/**
@@ -148,9 +154,10 @@ public class Dependencies implements Closeable {
 
 		Map<Class<?>, List<Method>> dependencyLocator = new HashMap<Class<?>, List<Method>>();
 
-		// create a map of all dependencies exposed by modules: type -> getter
-		// method
-		// this obviously doesn't include singletons
+		// first pass: create a map of all dependencies exposed by modules:
+		// type -> getter method
+		// this obviously doesn't include anything in singletons or declared as
+		// services
 		for (Class<?> moduleType : moduleTypes) {
 			BeanInfo bi = null;
 			try {
@@ -181,10 +188,68 @@ public class Dependencies implements Closeable {
 			}
 		}
 
+		List<Class<?>> modulesToBeConstructed = new LinkedList<Class<?>>();
+		for (Class<?> moduleClass : moduleTypes) {
+			modulesToBeConstructed.add(moduleClass);
+		}
+
+		try {
+			// sort the modules by the number of constructor arguments
+			Collections.sort(modulesToBeConstructed,
+					new Comparator<Class<?>>() {
+						@Override
+						public int compare(Class<?> o1, Class<?> o2) {
+							int c1ParamCount = 0;
+							Constructor<?>[] c1 = o1.getConstructors();
+							if (c1.length > 1) {
+								throw new RuntimeException();
+							}
+							c1ParamCount = c1[0].getParameterTypes().length;
+							
+							int c2ParamCount = 0;
+							Constructor<?>[] c2 = o2.getConstructors();
+							c2ParamCount = c2[0].getParameterTypes().length;
+							
+							return new Integer(c1ParamCount).compareTo(c2ParamCount);
+						}
+					});
+		} catch (RuntimeException e) {
+			throw new DependencyException(
+					"Modules should have only one constructor.");
+		}
+		for (int count = 0; modulesToBeConstructed.size() > 0 && count < 10; count++) {
+			constructModules(dependencyLocator, modulesToBeConstructed);
+			for (Iterator<Class<?>> itr = modulesToBeConstructed.iterator(); itr
+					.hasNext();) {
+				Class<?> moduleType = itr.next();
+				for (Object rootModule : rootModules) {
+					if (rootModule.getClass().equals(moduleType)) {
+						itr.remove();
+						logger.info(String.format("Module %s populated",
+								moduleType));
+						break;
+					}
+				}
+			}
+		}
+		
+		if (modulesToBeConstructed.size() > 0) {
+			throw new DependencyException(String.format(
+					"Failed to resolve dependencies for modules: %s",
+					modulesToBeConstructed));
+		}
+	}
+
+	private void constructModules(
+			Map<Class<?>, List<Method>> dependencyLocator,
+			List<Class<?>> moduleTypes) throws DependencyException {
 		// for all modules, try to match the constructor parameters first to a
 		// singleton dependency, then a dependency provided by another module
 		// and finally, to the ServiceLoader
-		for (Class<?> moduleType : moduleTypes) {
+		logger.info(String.format("Attempting to populate modules: %s",
+				moduleTypes));
+
+		modules: for (Class<?> moduleType : moduleTypes) {
 			Constructor<?>[] ctors = moduleType.getConstructors();
 			for (Constructor<?> ctor : ctors) {
 				Class<?>[] parameterTypes = ctor.getParameterTypes();
@@ -253,12 +318,25 @@ public class Dependencies implements Closeable {
 										break;
 									}
 								}
-							} else if (getter == null
-									&& getters.size() == 1) {
+							} else if (getter == null && getters.size() == 1) {
 								getter = getters.get(0);
 							} else {
-								throw new DependencyException("Cannot find unique dependency"
-										+ "to inject of type " + requiredType);
+								throw new DependencyException(
+										"Cannot find unique dependency"
+												+ "to inject of type "
+												+ requiredType);
+							}
+
+							if (getter == null) {
+								// could simply have not reached required
+								// dependency yet:
+								// try again on next pass
+								logger.info(String
+										.format("Could not find getter for type %s annotated with %s "
+												+ "- will try again on next pass",
+												requiredType,
+												requiredAnnotations));
+								continue modules;
 							}
 
 							for (Object d : rootModules) {
@@ -266,10 +344,14 @@ public class Dependencies implements Closeable {
 										d.getClass())) {
 									try {
 										parameterValues[i] = getter.invoke(d);
-										logger.info(String
-												.format("Injecting dependency of type into constructor %s => %s",
-														requiredType,
-														moduleType));
+										String msg = "Injecting dependency of type into constructor %s => %s";
+										if (requiredAnnotations.size() > 0) {
+											msg = String.format(
+													"%s - annotated with [%s]",
+													msg, requiredAnnotations);
+										}
+										logger.info(String.format(msg,
+												requiredType, moduleType));
 										break;
 									} catch (Exception e) {
 										throw new DependencyException(e);
@@ -292,6 +374,14 @@ public class Dependencies implements Closeable {
 								break;
 							}
 						}
+					}
+				}
+				
+				for (int i = 0; i < parameterValues.length; i++) {
+					Object parameterValue = parameterValues[i];
+					if (parameterValue == null) {
+						throw new DependencyException(String.format("Cannot resolve parameter of type %s "
+								+ "for constructor %s in module %s", parameterTypes[i], ctor, moduleType));
 					}
 				}
 				try {
@@ -375,7 +465,17 @@ public class Dependencies implements Closeable {
 		T result = null;
 		// try the singletons container first
 		if (Object.class.equals(getClass().getSuperclass())) {
-			result = (T) singletons.get(type);
+			for (Class<?> singletonType : singletons.keySet()) {
+				if (type.isAssignableFrom(singletonType)) {
+					if (result == null) {
+						result = (T) singletons.get(singletonType);
+					} else {
+						throw new DependencyException(
+								"Unable to find unique singleton of type "
+										+ type);
+					}
+				}
+			}
 		}
 		// then the module bindings
 		if (result == null) {
