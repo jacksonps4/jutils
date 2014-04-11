@@ -205,12 +205,13 @@ public class Dependencies implements Closeable {
 								throw new RuntimeException();
 							}
 							c1ParamCount = c1[0].getParameterTypes().length;
-							
+
 							int c2ParamCount = 0;
 							Constructor<?>[] c2 = o2.getConstructors();
 							c2ParamCount = c2[0].getParameterTypes().length;
-							
-							return new Integer(c1ParamCount).compareTo(c2ParamCount);
+
+							return new Integer(c1ParamCount)
+									.compareTo(c2ParamCount);
 						}
 					});
 		} catch (RuntimeException e) {
@@ -232,7 +233,7 @@ public class Dependencies implements Closeable {
 				}
 			}
 		}
-		
+
 		if (modulesToBeConstructed.size() > 0) {
 			throw new DependencyException(String.format(
 					"Failed to resolve dependencies for modules: %s",
@@ -376,18 +377,38 @@ public class Dependencies implements Closeable {
 						}
 					}
 				}
-				
+
+				String msg = null;
 				for (int i = 0; i < parameterValues.length; i++) {
 					Object parameterValue = parameterValues[i];
 					if (parameterValue == null) {
-						throw new DependencyException(String.format("Cannot resolve parameter of type %s "
-								+ "for constructor %s in module %s", parameterTypes[i], ctor, moduleType));
+						if (parameterAnnotations[i].length > 0) {
+							List<Class<? extends Annotation>> annotationTypes = new LinkedList<Class<? extends Annotation>>();
+							for (Annotation annotation : parameterAnnotations[i]) {
+								annotationTypes
+										.add(annotation.annotationType());
+							}
+							msg = String
+									.format("This run didn't resolve parameter of type %s "
+											+ "annotated with %s for constructor %s in module %s",
+											parameterTypes[i], annotationTypes,
+											ctor, moduleType);
+						} else {
+							msg = String
+									.format("This run didn't resolve parameter of type %s "
+											+ "for constructor %s in module %s",
+											parameterTypes[i], ctor, moduleType);
+						}
+						logger.info(msg);
 					}
 				}
-				try {
-					rootModules.add(ctor.newInstance(parameterValues));
-				} catch (Exception e) {
-					throw new DependencyException(e);
+
+				if (msg == null) {
+					try {
+						rootModules.add(ctor.newInstance(parameterValues));
+					} catch (Exception e) {
+						throw new DependencyException(e);
+					}
 				}
 			}
 		}
