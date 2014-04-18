@@ -6,7 +6,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+ */
 package com.minorityhobbies.util;
 
 import java.util.HashMap;
@@ -14,21 +14,21 @@ import java.util.Hashtable;
 import java.util.Map;
 
 import javax.naming.Context;
+import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.naming.spi.InitialContextFactory;
 
 /**
- * When deploying against an application server or testing code that will run
- * in a different target environment, it is often useful to be able to set up
- * a {@link Context} to test against. This is an in-memory context which 
- * does not support all of the standard {@link Context} methods but does 
- * support Context.bind and Context.lookup without any of the hierarchical
- * searching.
+ * When deploying against an application server or testing code that will run in
+ * a different target environment, it is often useful to be able to set up a
+ * {@link Context} to test against. This is an in-memory context which does not
+ * support all of the standard {@link Context} methods but does support
+ * Context.bind and Context.lookup without any of the hierarchical searching.
  * 
- * To use this factory, either include a <code>jndi.properties</code> 
- * file on the classpath containing the property 
- * <code>java.naming.factory.initial</code> or set the same as a System 
- * property.
+ * To use this factory, either include a <code>jndi.properties</code> file on
+ * the classpath containing the property
+ * <code>java.naming.factory.initial</code> or set the same as a System
+ * property. Alternatively, use the newInitialContext() static method.
  * 
  * This is not thread-safe.
  */
@@ -47,5 +47,11 @@ public class BasicInitialContextFactory implements InitialContextFactory {
 			}
 			return context;
 		}
+	}
+
+	public static InitialContext newInitialContext() throws NamingException {
+		System.setProperty(Context.INITIAL_CONTEXT_FACTORY,
+				BasicInitialContextFactory.class.getName());
+		return new InitialContext();
 	}
 }
