@@ -6,17 +6,20 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+ */
 package com.minorityhobbies.util;
 
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -45,7 +48,7 @@ public class FileUtils {
 			in = new FileInputStream(file);
 			byte[] b = new byte[1024 * 64];
 			StringBuilder fileData = new StringBuilder();
-			for (int read = 0; (read = in.read(b)) > -1; ) {
+			for (int read = 0; (read = in.read(b)) > -1;) {
 				fileData.append(new String(b, 0, read));
 			}
 			return fileData.toString();
@@ -103,6 +106,48 @@ public class FileUtils {
 	}
 
 	/**
+	 * Gets the sub-directories in the specified directory and all
+	 * sub-directories.
+	 * 
+	 * @param dir
+	 *            The directory in which to find sub-directories.
+	 * @return The sub-directories in the specified directory and all of its
+	 *         sub-directories sorted in order of depth, deepest first (this
+	 *         is useful for deleting recursively).
+	 */
+	public static List<File> listDirectoriesRecursively(File dir) {
+		if (dir == null) {
+			throw new IllegalArgumentException("Cannot read null file");
+		}
+		if (!dir.isDirectory()) {
+			throw new IllegalArgumentException("Must specify a directory");
+		}
+
+		List<File> directories = listDirectoryFilesRecursively(dir);
+		Collections.sort(directories, new Comparator<File>() {
+			@Override
+			public int compare(File f1, File f2) {
+				int f1Depth = f1.getAbsolutePath().split(System.getProperty("file.separator")).length;
+				int f2Depth = f2.getAbsolutePath().split(System.getProperty("file.separator")).length;
+				return (f2Depth < f1Depth) ? -1 : ((f2Depth == f1Depth) ? 0 : 1);
+			}
+		});
+		return directories;
+	}
+
+	private static List<File> listDirectoryFilesRecursively(File dir) {
+		List<File> allDirs = new LinkedList<File>();
+		File[] dirFiles = dir.listFiles();
+		allDirs.add(dir);
+		for (File dirFile : dirFiles) {
+			if (dirFile.isDirectory()) {
+				allDirs.addAll(listDirectoryFilesRecursively(dirFile));
+			}
+		}
+		return allDirs;
+	}
+
+	/**
 	 * Follows the moving tail end of a file (much like UNIX 'tail -f').
 	 * 
 	 * @param f
@@ -155,18 +200,19 @@ public class FileUtils {
 			}
 		};
 	}
-	
+
 	public static final class Tail {
 		public static void main(String[] args) throws IOException {
 			if (args.length < 1) {
-				System.err.printf("usage: java %s filename%n", Tail.class.getName());
+				System.err.printf("usage: java %s filename%n",
+						Tail.class.getName());
 				System.exit(1);
 			}
-			
+
 			String filename = args[0];
 			File file = new File(filename);
 			if (!file.exists()) {
-				throw new FileNotFoundException(file.getName());				
+				throw new FileNotFoundException(file.getName());
 			}
 			followTail(file, new Performer<String>() {
 				@Override
@@ -174,6 +220,24 @@ public class FileUtils {
 					System.out.printf("%s", val);
 				}
 			});
+		}
+	}
+
+	/**
+	 * Writes the specified data to the specified file, overwriting an existing
+	 * data.
+	 * 
+	 * @param f
+	 *            The file to be written.
+	 * @param data
+	 *            The data to write.
+	 * @throws IOException
+	 *             If an I/O error occurred.
+	 */
+	public static final void writeDataToFile(File f, String data)
+			throws IOException {
+		try (FileWriter writer = new FileWriter(f)) {
+			writer.write(data);
 		}
 	}
 }
