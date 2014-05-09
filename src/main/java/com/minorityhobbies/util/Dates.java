@@ -58,6 +58,12 @@ public class Dates {
 		cal.add(Calendar.DAY_OF_YEAR, 1);
 		return cal.getTime();
 	}
+	
+	public static Date newDateMidnightYesterday() {
+		Calendar cal = getCalendarWithoutTimePortion();
+		cal.add(Calendar.DAY_OF_YEAR, -1);
+		return cal.getTime();
+	}
 
 	private static Calendar getCalendarWithoutTimePortion() {
 		Calendar cal = Calendar.getInstance();
