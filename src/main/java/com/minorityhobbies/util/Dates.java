@@ -124,4 +124,12 @@ public class Dates {
 		cal.set(Calendar.DAY_OF_YEAR, 1);
 		return cal.getTime();
 	}
+	
+	public static Date endOfCurrentYear() {
+		Calendar cal = getCalendarWithoutTimePortion();
+		cal.set(Calendar.DAY_OF_YEAR, 1);
+		cal.add(Calendar.YEAR, 1);
+		cal.add(Calendar.DAY_OF_YEAR, -1);
+		return cal.getTime();
+	}
 }
