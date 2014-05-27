@@ -6,7 +6,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+ */
 package com.minorityhobbies.util;
 
 import java.io.File;
@@ -25,8 +25,6 @@ import java.util.Properties;
  * 
  */
 public class ClasspathUtils {
-	private static final ClassLoader CLASSLOADER = ClasspathUtils.class.getClassLoader();
-	
 	private ClasspathUtils() {
 	}
 
@@ -44,7 +42,8 @@ public class ClasspathUtils {
 	public static String readFile(String path) throws IOException {
 		InputStream in = null;
 		try {
-			in = CLASSLOADER.getResourceAsStream(path);
+			in = Thread.currentThread().getContextClassLoader()
+					.getResourceAsStream(path);
 			if (in == null) {
 				return null;
 			}
@@ -77,7 +76,8 @@ public class ClasspathUtils {
 	 */
 	public static List<File> readFiles(String path) throws IOException {
 		List<File> files = new ArrayList<File>();
-		URL resourceUrl = CLASSLOADER.getResource(path);
+		URL resourceUrl = Thread.currentThread().getContextClassLoader()
+				.getResource(path);
 		if (resourceUrl == null) {
 			throw new FileNotFoundException(path);
 		}
@@ -109,7 +109,8 @@ public class ClasspathUtils {
 	public static Properties readProperties(String relativePath)
 			throws IOException {
 		Properties properties = new Properties();
-		InputStream in = CLASSLOADER.getResourceAsStream(relativePath);
+		InputStream in = Thread.currentThread().getContextClassLoader()
+				.getResourceAsStream(relativePath);
 		if (in == null) {
 			return null;
 		}
@@ -126,7 +127,8 @@ public class ClasspathUtils {
 	 *         specified classpath relative file.
 	 */
 	public static File getClasspathRelativePath(String path) {
-		URL url = CLASSLOADER.getResource(path);
+		URL url = Thread.currentThread().getContextClassLoader()
+				.getResource(path);
 		if (url == null) {
 			return null;
 		}
