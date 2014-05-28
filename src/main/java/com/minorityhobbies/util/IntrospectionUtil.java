@@ -21,11 +21,14 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class IntrospectionUtil {
 	private final Class<?> type;
 	private final Map<String, PropertyDescriptor> pds = new HashMap<String, PropertyDescriptor>();
-
+	private final Pattern numeric = Pattern.compile("[0-9]+");
+	
 	public IntrospectionUtil(Class<?> type) throws IntrospectionException {
 		super();
 		this.type = type;
@@ -140,7 +143,12 @@ public class IntrospectionUtil {
 				return Double.parseDouble(v);
 			}
 			if (Date.class == targetType) {
-				return new Date(Long.parseLong(v));
+				Matcher nm = numeric.matcher(v);
+				if (nm.matches()) {
+					return new Date(Long.parseLong(v));
+				} else {
+					return Dates.parseCommonDateFormats(v);
+				}
 			}
 			if (Enum.class.isAssignableFrom(targetType)) {
 				Class<? extends Enum> e = (Class<? extends Enum>) targetType;

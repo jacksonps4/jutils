@@ -13,12 +13,15 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
 import java.sql.Timestamp;
+import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 
 public class Dates {
+	private static final DateFormat dateFormat1 = new SimpleDateFormat("yyyy-MM-dd");
+	
 	private Dates() {
 	}
 
@@ -131,5 +134,15 @@ public class Dates {
 		cal.add(Calendar.YEAR, 1);
 		cal.add(Calendar.DAY_OF_YEAR, -1);
 		return cal.getTime();
+	}
+	
+	public static Date parseCommonDateFormats(String date) {
+		try {
+			Date result = dateFormat1.parse(date);
+			return result;
+		} catch (ParseException e) {
+		}
+		
+		return null;
 	}
 }
