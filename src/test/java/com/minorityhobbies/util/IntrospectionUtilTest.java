@@ -2,6 +2,7 @@ package com.minorityhobbies.util;
 
 import static org.junit.Assert.assertEquals;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import org.junit.Before;
@@ -51,5 +52,15 @@ public class IntrospectionUtilTest {
 		Map<String, Object> map = introspectionUtil.propertiesToMap(testFoo);
 		assertEquals(map.toString(), 1, map.size());
 		assertEquals(v1, map.get("member"));
+	}
+	
+	@Test
+	public void testMapToProperty() {
+		Foo testFoo = new Foo();
+		String v1 = "v1Value";
+		Map<String, Object> map = new HashMap<>();
+		map.put("member", v1);
+		introspectionUtil.mapToProperties(testFoo, map);
+		assertEquals(v1, testFoo.getMember());
 	}
 }

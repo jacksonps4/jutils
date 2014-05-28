@@ -39,4 +39,12 @@ public class StringUtilsTest {
 		assertEquals("", fields[4]);
 		assertEquals("120.00", fields[5]);
 	}
+	
+	@Test
+	public void testSnakeCaseToCamelCase() {
+		assertEquals("convertedValueOne", StringUtils.convertSnakeCaseToCamelCase("converted_value_one"));
+		assertEquals("anotherTwo", StringUtils.convertSnakeCaseToCamelCase("another_two"));
+		assertEquals("ending", StringUtils.convertSnakeCaseToCamelCase("ending_"));
+		assertEquals("Beginning", StringUtils.convertSnakeCaseToCamelCase("_beginning"));
+	}
 }

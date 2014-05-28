@@ -54,4 +54,20 @@ public class StringUtils {
 		
 		return fields.toArray(new String[fields.size()]);
 	}
+	
+	public static String convertSnakeCaseToCamelCase(String value) {
+	    StringBuilder result = new StringBuilder();
+		char[] v = value.toCharArray();
+	    for (int i = 0; i < v.length; i++) {
+	    	char c = v[i];
+	    	if (c == '_') {
+	    		if ((i + 1) < v.length) {
+	    			result.append(Character.toUpperCase(v[++i]));
+	    		}
+	    	} else {
+	    		result.append(c);
+	    	}
+	    }
+	    return result.toString();
+	}
 }

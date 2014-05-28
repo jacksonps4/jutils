@@ -6,7 +6,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+ */
 package com.minorityhobbies.util;
 
 import java.beans.BeanInfo;
@@ -41,27 +41,49 @@ public class IntrospectionUtil {
 		return new ArrayList<String>(pds.keySet());
 	}
 
+	PropertyDescriptor getPropertyDescriptor(String name) {
+		PropertyDescriptor pd = pds.get(name);
+		if (pd == null) {
+			// try underscores -> camelcase
+			pd = pds.get(StringUtils.convertSnakeCaseToCamelCase(name));
+		}
+		if (pd != null) {
+			return pd;
+		} else {
+			throw new IllegalArgumentException(String.format(
+					"Property '%s' not found on instance of type '%s'", name,
+					type.getName()));
+		}
+	}
+
 	public Object getNamedProperty(String name, Object target) {
 		if (target == null) {
 			throw new NullPointerException();
 		}
 
-		PropertyDescriptor pd = pds.get(name);
-		if (pd != null) {
-			Method getter = pd.getReadMethod();
-			try {
-				return getter.invoke(target);
-			} catch (IllegalArgumentException e) {
-				throw new RuntimeException(e);
-			} catch (IllegalAccessException e) {
-				throw new RuntimeException(e);
-			} catch (InvocationTargetException e) {
-				throw new RuntimeException(e);
-			}
-		} else {
-			throw new IllegalArgumentException(String.format(
-					"Property '%s' not found on instance of type '%s'", name,
-					target.getClass().getName()));
+		Method getter = getPropertyDescriptor(name).getReadMethod();
+		try {
+			return getter.invoke(target);
+		} catch (IllegalArgumentException e) {
+			throw new RuntimeException(e);
+		} catch (IllegalAccessException e) {
+			throw new RuntimeException(e);
+		} catch (InvocationTargetException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	public void setNamedProperty(String name, Object value, Object target) {
+		if (target == null) {
+			throw new NullPointerException();
+		}
+
+		Method setter = getPropertyDescriptor(name).getWriteMethod();
+		try {
+			setter.invoke(target, value);
+		} catch (IllegalAccessException | IllegalArgumentException
+				| InvocationTargetException e) {
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -73,6 +95,15 @@ public class IntrospectionUtil {
 			}
 		}
 		return row;
+	}
+
+	public void mapToProperties(Object obj, Map<String, Object> properties) {
+		for (Map.Entry<String, Object> property : properties.entrySet()) {
+			String propertyName = property.getKey();
+			Object propertyValue = property.getValue();
+
+			setNamedProperty(propertyName, propertyValue, obj);
+		}
 	}
 
 	public Class<?> getType() {
