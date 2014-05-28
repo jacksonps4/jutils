@@ -16,6 +16,7 @@ import java.beans.PropertyDescriptor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -80,11 +81,56 @@ public class IntrospectionUtil {
 
 		Method setter = getPropertyDescriptor(name).getWriteMethod();
 		try {
-			setter.invoke(target, value);
+			setter.invoke(target, convertValueIfNecessary(value, setter.getParameterTypes()[0]));
 		} catch (IllegalAccessException | IllegalArgumentException
 				| InvocationTargetException e) {
 			throw new RuntimeException(e);
 		}
+	}
+
+	private Object convertValueIfNecessary(Object value, Class<?> targetType) {
+		if (value == null) {
+			return null;
+		}
+		
+		if (value instanceof String) {
+			String v = (String) value;
+			if (String.class == targetType) {
+				return value;
+			}
+			if (Boolean.class == targetType) {
+				String b = v.trim();
+				if ("0".equals(b) || "no".equals(b.toLowerCase())) {
+					return false;
+				} else if ("1".equals(b) || "yes".equals(b.toLowerCase())) {
+					return true;
+				} else {
+					return Boolean.parseBoolean(b);
+				}
+			}
+			if (Byte.class == targetType || byte.class == targetType) {
+				return Byte.parseByte(v);
+			}
+			if (Short.class == targetType || short.class == targetType) {
+				return Short.parseShort(v);
+			}
+			if (Integer.class == targetType || int.class == targetType) {
+				return Integer.parseInt(v);
+			}
+			if (Long.class == targetType || long.class == targetType) {
+				return Long.parseLong(v);
+			}
+			if (Float.class == targetType || float.class == targetType) {
+				return Float.parseFloat(v);
+			}
+			if (Double.class == targetType || double.class == targetType) {
+				return Double.parseDouble(v);
+			}
+			if (Date.class == targetType) {
+				return new Date(Long.parseLong(v));
+			}
+		}
+		return value;
 	}
 
 	public Map<String, Object> propertiesToMap(Object obj) {
