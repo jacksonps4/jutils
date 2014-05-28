@@ -94,17 +94,21 @@ public class IntrospectionUtil {
 		}
 	}
 
-	private Object convertValueIfNecessary(Object value, Class<?> targetType) {
+	private Object convertValueIfNecessary(Object value, Class<? extends Object> targetType) {
 		if (value == null) {
 			return null;
 		}
 
 		if (value instanceof String) {
 			String v = (String) value;
+			if (v.trim().length() == 0) {
+				return null;
+			}
+			
 			if (String.class == targetType) {
 				return value;
 			}
-			if (Boolean.class == targetType) {
+			if (Boolean.class == targetType || boolean.class == targetType) {
 				String b = v.trim();
 				if ("0".equals(b) || "no".equals(b.toLowerCase())) {
 					return false;
@@ -134,6 +138,10 @@ public class IntrospectionUtil {
 			}
 			if (Date.class == targetType) {
 				return new Date(Long.parseLong(v));
+			}
+			if (Enum.class.isAssignableFrom(targetType)) {
+				Class<? extends Enum> e = (Class<? extends Enum>) targetType;
+				return Enum.valueOf(e, v);
 			}
 		}
 		return value;
