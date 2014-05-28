@@ -90,11 +90,14 @@ public class IntrospectionUtil {
 							setter.getParameterTypes()[0]));
 		} catch (IllegalAccessException | IllegalArgumentException
 				| InvocationTargetException e) {
-			throw new RuntimeException(e);
+			throw new RuntimeException(String.format(
+					"Failed to set field '%s' " + " to value '%s' on object of type '%s'",
+					name, value, type), e);
 		}
 	}
 
-	private Object convertValueIfNecessary(Object value, Class<? extends Object> targetType) {
+	private Object convertValueIfNecessary(Object value,
+			Class<? extends Object> targetType) {
 		if (value == null) {
 			return null;
 		}
@@ -104,7 +107,7 @@ public class IntrospectionUtil {
 			if (v.trim().length() == 0) {
 				return null;
 			}
-			
+
 			if (String.class == targetType) {
 				return value;
 			}
