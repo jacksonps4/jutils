@@ -2,6 +2,7 @@ package com.minorityhobbies.util;
 
 import static org.junit.Assert.assertEquals;
 
+import java.beans.IntrospectionException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,6 +38,18 @@ public class IntrospectionUtilTest {
 
 		public void setTimestamp(Date timestamp) {
 			this.timestamp = timestamp;
+		}
+	}
+	
+	public class Bar extends Foo {
+		private String derivedValue;
+
+		public String getDerivedValue() {
+			return derivedValue;
+		}
+
+		public void setDerivedValue(String derivedValue) {
+			this.derivedValue = derivedValue;
 		}
 	}
 	
@@ -105,5 +118,25 @@ public class IntrospectionUtilTest {
 		map.put("value", 55);
 		introspectionUtil.mapToProperties(testFoo, map);
 		assertEquals(55, testFoo.getValue());
+	}
+	
+	@Test
+	public void testMapSubclassRow() throws IntrospectionException {
+		introspectionUtil = new IntrospectionUtil(Bar.class);
+		
+		Bar testBar = new Bar();
+		String v1 = "v1Value";
+		int value = 42;
+		Date ts = new Date();
+		testBar.setMember(v1);
+		testBar.setValue(value);
+		testBar.setTimestamp(ts);
+		testBar.setDerivedValue("dv");
+		Map<String, Object> map = introspectionUtil.propertiesToMap(testBar);
+		assertEquals(map.toString(), 4, map.size());
+		assertEquals(v1, map.get("member"));
+		assertEquals(value, map.get("value"));
+		assertEquals(ts, map.get("timestamp"));
+		assertEquals("dv", map.get("derivedValue"));
 	}
 }

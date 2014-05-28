@@ -24,17 +24,20 @@ import java.util.Map;
 
 public class IntrospectionUtil {
 	private final Class<?> type;
-	private final BeanInfo descriptor;
 	private final Map<String, PropertyDescriptor> pds = new HashMap<String, PropertyDescriptor>();
 
 	public IntrospectionUtil(Class<?> type) throws IntrospectionException {
 		super();
 		this.type = type;
-		this.descriptor = Introspector.getBeanInfo(type);
-		for (PropertyDescriptor pd : descriptor.getPropertyDescriptors()) {
-			if (!"class".equals(pd.getName())) {
-				pds.put(pd.getName(), pd);
+		Class<?> currentType = type;
+		while (currentType != Object.class) {
+			BeanInfo descriptor = Introspector.getBeanInfo(currentType);
+			for (PropertyDescriptor pd : descriptor.getPropertyDescriptors()) {
+				if (!"class".equals(pd.getName())) {
+					pds.put(pd.getName(), pd);
+				}
 			}
+			currentType = currentType.getSuperclass();
 		}
 	}
 
@@ -81,7 +84,10 @@ public class IntrospectionUtil {
 
 		Method setter = getPropertyDescriptor(name).getWriteMethod();
 		try {
-			setter.invoke(target, convertValueIfNecessary(value, setter.getParameterTypes()[0]));
+			setter.invoke(
+					target,
+					convertValueIfNecessary(value,
+							setter.getParameterTypes()[0]));
 		} catch (IllegalAccessException | IllegalArgumentException
 				| InvocationTargetException e) {
 			throw new RuntimeException(e);
@@ -92,7 +98,7 @@ public class IntrospectionUtil {
 		if (value == null) {
 			return null;
 		}
-		
+
 		if (value instanceof String) {
 			String v = (String) value;
 			if (String.class == targetType) {
