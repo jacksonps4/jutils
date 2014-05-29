@@ -112,7 +112,7 @@ public class IntrospectionUtil {
 			}
 
 			if (String.class == targetType) {
-				return value;
+				return v;
 			}
 			if (Boolean.class == targetType || boolean.class == targetType) {
 				String b = v.trim();
