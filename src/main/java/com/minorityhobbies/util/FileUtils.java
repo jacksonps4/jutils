@@ -89,20 +89,19 @@ public class FileUtils {
 			throw new IllegalArgumentException("Must specify a directory");
 		}
 
-		return listDirFilesRecursively(dir);
+		List<File> files = new LinkedList<>();
+		listDirFilesRecursively(dir, files);
+		return files;
 	}
 
-	private static List<File> listDirFilesRecursively(File dir) {
-		List<File> allFiles = new LinkedList<File>();
-		File[] dirFiles = dir.listFiles();
-		for (File dirFile : dirFiles) {
-			if (dirFile.isDirectory()) {
-				allFiles.addAll(listDirFilesRecursively(dirFile));
-			} else {
-				allFiles.add(dirFile);
+	private static void listDirFilesRecursively(File dir, List<File> allFiles) {
+		if (dir.isDirectory()) {
+			for (File f : dir.listFiles()) {
+				listDirFilesRecursively(f, allFiles);
 			}
+		} else {
+			allFiles.add(dir);
 		}
-		return allFiles;
 	}
 
 	/**

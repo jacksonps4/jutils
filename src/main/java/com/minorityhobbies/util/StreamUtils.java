@@ -50,4 +50,30 @@ public class StreamUtils {
 		}
 		return data.toString();
 	}
+	
+	public static String readWord(InputStream in) throws IOException {
+		StringBuilder word = new StringBuilder();
+		boolean readingWord = false;
+		int chr;
+		while ((chr = in.read()) > -1) {
+			boolean ws = Character.isWhitespace((char) chr);
+			if (ws) {
+				if (readingWord) {
+					return word.toString();
+				}
+				readingWord = false;
+			} else {
+				readingWord = true;
+				word.append((char) chr);
+			}
+		}
+		if (readingWord) {
+			word.append((char) chr);
+		}
+		if (chr == -1 && word.length() == 0) {
+			return null;
+		}
+		return word.toString();
+
+	}
 }
