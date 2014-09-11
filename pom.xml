@@ -6,6 +6,12 @@
 	<version>1.3-SNAPSHOT</version>
 	<name>Core Java Utilities module</name>
 
+    <scm>
+        <connection>scm:git:https://github.com/jacksonps4/jutils.git</connection>
+        <developerConnection>scm:git:git@github.com:jacksonps4/jutils.git</developerConnection>
+        <url>https://github.com/jacksonps4</url>
+    </scm>
+
 	<dependencies>
 		<dependency>
 			<groupId>junit</groupId>
