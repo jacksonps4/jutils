@@ -28,7 +28,12 @@ public class EventBusTest {
         testBus.subscribe(m -> result.set(m));
 
         testBus.publish("foo");
-        Thread.sleep(50L);
+        for (int i = 0; i < 200; i++) {
+            Thread.sleep(10L);
+            if (result.get() != null) {
+                break;
+            }
+        }
         assertEquals("foo", result.get());
     }
 }
