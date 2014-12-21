@@ -24,7 +24,10 @@ import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
+import java.util.function.Function;
 import java.util.logging.Logger;
+
+import javax.sql.DataSource;
 
 public class JDBCUtils {
 	private static final Logger LOGGER = Logger.getLogger(JDBCUtils.class
@@ -312,5 +315,24 @@ public class JDBCUtils {
 				return result;
 			}
 		};
+	}
+	
+	@FunctionalInterface
+	public interface JdbcResultSetMapper<T> extends Function<ResultSet, T> {
+	}
+	
+	public static <T> List<T> queryForList(DataSource dataSource, String sql,
+			JdbcResultSetMapper<T> mapper) throws SQLException {
+		try (Connection connection = dataSource.getConnection()) {
+			try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+				try (ResultSet rs = stmt.executeQuery()) {
+					List<T> results = new LinkedList<>();
+					while (rs.next()) {
+						mapper.apply(rs);
+					}
+					return results;
+				}
+			}
+		}
 	}
 }
