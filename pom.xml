@@ -2,14 +2,14 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.minorityhobbies</groupId>
 	<artifactId>jutils</artifactId>
-	<version>1.7</version>
+	<version>1.8-SNAPSHOT</version>
 	<name>Core Java Utilities module</name>
 
     <scm>
         <connection>scm:git:https://github.com/jacksonps4/jutils.git</connection>
         <developerConnection>scm:git:git@github.com:jacksonps4/jutils.git</developerConnection>
         <url>https://github.com/jacksonps4</url>
-      <tag>jutils-1.7</tag>
+      <tag>HEAD</tag>
   </scm>
 
 	<dependencies>
