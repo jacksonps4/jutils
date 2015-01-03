@@ -70,4 +70,33 @@ public class StringUtils {
 	    }
 	    return result.toString();
 	}
+	
+	public static String anyToCamelCase(String any) {
+		StringBuilder result = new StringBuilder();
+		char[] cb = any.toCharArray();
+		boolean nextUpper = false;
+		for (int i = 0; i < cb.length; i++) {
+			char c = cb[i];
+
+			if (i == 0) {
+				result.append(Character.toLowerCase(c));
+				continue;
+			}
+
+			if (Character.isWhitespace(c)
+					|| !(Character.isAlphabetic(c) || Character.isDigit(c))) {
+				nextUpper = true;
+				continue;
+			}
+
+			if (nextUpper) {
+				nextUpper = false;
+				result.append(Character.toUpperCase(c));
+				continue;
+			}
+
+			result.append(c);
+		}
+		return result.toString();
+	}
 }
