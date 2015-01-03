@@ -15,7 +15,9 @@ import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.time.temporal.TemporalAccessor;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -150,9 +152,29 @@ public class IntrospectionUtil {
 					return Dates.parseCommonDateFormats(v);
 				}
 			}
+			if (TemporalAccessor.class.isAssignableFrom(targetType)) {
+				try {
+					Method parseMethod = getMethod(targetType, "parse", CharSequence.class);
+					return parseMethod.invoke(null, v);
+				} catch (NoSuchMethodException | IllegalAccessException
+						| IllegalArgumentException | InvocationTargetException e) {
+					throw new RuntimeException(e);
+				}
+			}
 			if (Enum.class.isAssignableFrom(targetType)) {
+				@SuppressWarnings({ "unchecked", "rawtypes" })
 				Class<? extends Enum> e = (Class<? extends Enum>) targetType;
-				return Enum.valueOf(e, v);
+				try {
+					Method parseMethod = getMethod(e, "parse", String.class);
+					return parseMethod.invoke(null, v);
+				} catch (NoSuchMethodException | SecurityException | IllegalAccessException
+						| IllegalArgumentException | InvocationTargetException e1) {
+					// failed to find parse method
+				}
+				
+				@SuppressWarnings("unchecked")
+				Object result = Enum.valueOf(e, v);
+				return result;
 			}
 		}
 		return value;
@@ -179,5 +201,18 @@ public class IntrospectionUtil {
 
 	public Class<?> getType() {
 		return type;
+	}
+	
+	public static Method getMethod(Class<?> type, String methodName, Class<?>... args) throws NoSuchMethodException {
+		Method[] methods = type.getDeclaredMethods();
+		for (Method m : methods) {
+			if (m.getName().equals(methodName)) {
+				if (args == null || args.length == 0 || Arrays.equals(args, m.getParameterTypes())) {
+					return m;
+				}
+			}
+		}
+		
+		throw new NoSuchMethodException();
 	}
 }
