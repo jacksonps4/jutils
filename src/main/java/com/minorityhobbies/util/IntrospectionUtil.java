@@ -35,7 +35,7 @@ public class IntrospectionUtil {
 		super();
 		this.type = type;
 		Class<?> currentType = type;
-		while (currentType != Object.class) {
+		while (currentType != null && currentType != Object.class) {
 			BeanInfo descriptor = Introspector.getBeanInfo(currentType);
 			for (PropertyDescriptor pd : descriptor.getPropertyDescriptors()) {
 				if (!"class".equals(pd.getName())) {
