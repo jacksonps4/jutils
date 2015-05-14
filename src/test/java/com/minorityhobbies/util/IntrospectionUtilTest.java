@@ -1,8 +1,10 @@
 package com.minorityhobbies.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 import java.beans.IntrospectionException;
+import java.time.LocalDate;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -15,7 +17,8 @@ public class IntrospectionUtilTest {
 		private String member;
 		private int value;
 		private Date timestamp;
-		
+		private LocalDate date;
+
 		public String getMember() {
 			return member;
 		}
@@ -39,6 +42,10 @@ public class IntrospectionUtilTest {
 		public void setTimestamp(Date timestamp) {
 			this.timestamp = timestamp;
 		}
+
+		public LocalDate getDate() { return date; }
+
+		public void setDate(LocalDate date) { this.date = date; }
 	}
 	
 	public class Bar extends Foo {
@@ -86,10 +93,11 @@ public class IntrospectionUtilTest {
 		testFoo.setValue(value);
 		testFoo.setTimestamp(ts);
 		Map<String, Object> map = introspectionUtil.propertiesToMap(testFoo);
-		assertEquals(map.toString(), 3, map.size());
+		assertEquals(map.toString(), 4, map.size());
 		assertEquals(v1, map.get("member"));
 		assertEquals(value, map.get("value"));
 		assertEquals(ts, map.get("timestamp"));
+		assertNull(map.get("date"));
 	}
 	
 	@Test
@@ -133,10 +141,20 @@ public class IntrospectionUtilTest {
 		testBar.setTimestamp(ts);
 		testBar.setDerivedValue("dv");
 		Map<String, Object> map = introspectionUtil.propertiesToMap(testBar);
-		assertEquals(map.toString(), 4, map.size());
+		assertEquals(map.toString(), 5, map.size());
 		assertEquals(v1, map.get("member"));
 		assertEquals(value, map.get("value"));
 		assertEquals(ts, map.get("timestamp"));
+		assertNull(map.get("date"));
 		assertEquals("dv", map.get("derivedValue"));
+	}
+
+	@Test
+	public void testMapDateFromLong() throws IntrospectionException {
+		introspectionUtil = new IntrospectionUtil(Foo.class);
+
+		Foo f = new Foo();
+		introspectionUtil.setNamedProperty("timestamp", 0L, f);
+		assertEquals(new Date(0L), f.getTimestamp());
 	}
 }

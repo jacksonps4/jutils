@@ -176,7 +176,13 @@ public class IntrospectionUtil {
 				Object result = Enum.valueOf(e, v);
 				return result;
 			}
+		} else {
+			if (value instanceof Long && Date.class == targetType) {
+				return new Date((long) value);
+			}
 		}
+
+
 		return value;
 	}
 
