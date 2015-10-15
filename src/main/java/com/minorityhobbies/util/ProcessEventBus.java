@@ -10,8 +10,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.logging.Logger;
 
 public class ProcessEventBus<T> extends AbstractEventBus<T> implements Runnable {
+    private final Logger logger = Logger.getLogger(getClass().getName());
     private final LinkedBlockingDeque<T> eventQueue = new LinkedBlockingDeque<>();
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
@@ -31,6 +33,8 @@ public class ProcessEventBus<T> extends AbstractEventBus<T> implements Runnable 
                 });
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+            } catch (RuntimeException e) {
+                logger.throwing(ProcessEventBus.class.getName(), "run", e);
             }
         }
     }
