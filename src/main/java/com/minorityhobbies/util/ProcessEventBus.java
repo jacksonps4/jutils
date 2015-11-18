@@ -1,15 +1,8 @@
 package com.minorityhobbies.util;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Logger;
 
 public class ProcessEventBus<T> extends AbstractEventBus<T> implements Runnable {
@@ -27,8 +20,12 @@ public class ProcessEventBus<T> extends AbstractEventBus<T> implements Runnable 
             try {
                 T event = eventQueue.take();
                 subscribers().forEach(s -> {
-                    if (s.matches().test(event)) {
-                        s.onEvent(event);
+                    try {
+                        if (s.matches().test(event)) {
+                            s.onEvent(event);
+                        }
+                    } catch (RuntimeException e) {
+                        logger.throwing(ProcessEventBus.class.getName(), "run", e);
                     }
                 });
             } catch (InterruptedException e) {
@@ -37,6 +34,7 @@ public class ProcessEventBus<T> extends AbstractEventBus<T> implements Runnable 
                 logger.throwing(ProcessEventBus.class.getName(), "run", e);
             }
         }
+        logger.warning("ProcessEventBus dispatcher thread terminated");
     }
 
     @Override
