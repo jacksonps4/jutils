@@ -2,7 +2,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.minorityhobbies</groupId>
 	<artifactId>jutils</artifactId>
-	<version>1.11</version>
+	<version>1.12-SNAPSHOT</version>
 	<name>Core Java Utilities module</name>
 	
 	<licenses>
@@ -25,7 +25,7 @@
         <connection>scm:git:https://github.com/jacksonps4/jutils.git</connection>
         <developerConnection>scm:git:git@github.com:jacksonps4/jutils.git</developerConnection>
         <url>https://github.com/jacksonps4</url>
-      	<tag>jutils-1.11</tag>
+      	<tag>HEAD</tag>
   	</scm>
 
 	<dependencies>
