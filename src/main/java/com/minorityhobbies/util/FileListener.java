@@ -12,5 +12,8 @@ package com.minorityhobbies.util;
 import java.io.File;
 
 public interface FileListener {
-	void processFile(File file);
+	enum FileListenerEventType {
+		CREATED, UPDATED, DELETED;
+	}
+	void processFile(File file, FileListenerEventType eventType);
 }

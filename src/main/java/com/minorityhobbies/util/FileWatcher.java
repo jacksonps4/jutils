@@ -9,106 +9,133 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 */
 package com.minorityhobbies.util;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.FilenameFilter;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 /**
  * A generic file watcher that enables directories to be watched for files of
  * interest.
- * 
- * @author chris@minorityhobbies.com (Chris Wraith)
- * 
+ *
+ * @author chrisw@minorityhobbies.com (Chris Wraith)
  */
-public class FileWatcher implements Runnable {
-	private final Logger logger = Logger.getLogger(getClass().getName());
+public class FileWatcher implements Closeable {
+    public static final long DEFAULT_CHECK_FREQUENCY_MILLIS = 500L;
 
-	private final File directory;
-	private final FileListener fileListener;
+    private final Logger logger = Logger.getLogger(getClass().getName());
+    private final ExecutorService thread = Executors.newSingleThreadExecutor();
 
-	private final FilenameFilter defaultFilter;
-	private FilenameFilter filter;
-	private Map<File, FileAttributes> cache = new HashMap<File, FileAttributes>();
-	private Set<File> processed = new HashSet<File>();
+    private final File directory;
+    private final FileListener fileListener;
+    private final FilenameFilter defaultFilter;
+    private final long checkFrequencyMillis;
 
-	private static final class FileAttributes {
-		final Long size;
-		final Long lastModified;
-		
-		public FileAttributes(Long size, Long lastModified) {
-			super();
-			this.size = size;
-			this.lastModified = lastModified;
-		}
-	}
-	
-	public FileWatcher(String directory, FileListener listener) {
-		this.directory = new File(directory);
-		if (!this.directory.exists()) {
-			throw new IllegalArgumentException(String.format(
-					"Directory '%s' does not exist.", directory));
-		}
-		this.defaultFilter = new FilenameFilter() {
-			@Override
-			public final boolean accept(File dir, String name) {
-				File file = new File(dir, name);
-				return !file.isDirectory();
-			}
-		};
-		this.filter = defaultFilter;
-		this.fileListener = listener;
-	}
+    private FilenameFilter filter;
 
-	@Override
-	public void run() {
-		logger.info(String.format("Starting file watcher for directory: %s",
-				directory));
+    private static final class FileAttributes {
+        final long size;
+        final long lastModified;
 
-		while (!Thread.currentThread().isInterrupted()) {
-			File[] files = directory.listFiles(filter);
-			if (cache.size() > 0) {
-				for (File file : files) {
-					if (cache.containsKey(file)) {
-						FileAttributes cachedFileAttr = cache.get(file);
-						if (cachedFileAttr.size == file.length()
-								&& cachedFileAttr.lastModified == file.lastModified()
-								&& !processed.contains(file)) {
-							try {
-								logger.info(String.format("Processing file '%s'", file.getAbsolutePath()));
-								processed.add(file);
-								fileListener.processFile(file);
-							} catch (Throwable t) {
-								logger.severe(String.format(
-										"Error processing file '%s': %s%n%s", file, t.getMessage(), ExceptionUtilities.getStackTraceAsString(t)));
-							}
-						}
-					}
-				}
-			}
+        public FileAttributes(long size, long lastModified) {
+            super();
+            this.size = size;
+            this.lastModified = lastModified;
+        }
+    }
 
-			cache = new HashMap<File, FileAttributes>();
-			for (File file : files) {
-				cache.put(file, new FileAttributes(file.length(), file.lastModified()));
-			}
-			try {
-				Thread.sleep(5000L);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			}
-		}
-	}
+    public FileWatcher(File directory, FileListener listener, long checkFrequency, TimeUnit unit) {
+        if (!directory.exists() || !directory.isDirectory()) {
+            throw new IllegalArgumentException(String.format(
+                    "Directory '%s' does not exist or is a file.", directory));
+        }
+        this.directory = directory;
+        this.defaultFilter = (dir, name) -> !new File(dir, name).isDirectory();
+        this.filter = defaultFilter;
+        this.fileListener = listener;
+        this.checkFrequencyMillis = TimeUnit.MILLISECONDS.convert(checkFrequency, unit);
+        thread.submit(this::watch);
+    }
 
-	public final void setFilter(final FilenameFilter filter) {
-		this.filter = new FilenameFilter() {
-			@Override
-			public boolean accept(File dir, String name) {
-				return defaultFilter.accept(dir, name)
-						&& filter.accept(dir, name);
-			}
-		};
-	}
+    public FileWatcher(File directory, FileListener listener) {
+        this(directory, listener, DEFAULT_CHECK_FREQUENCY_MILLIS, TimeUnit.MILLISECONDS);
+    }
+
+    public FileWatcher(String directory, FileListener listener) {
+        this(new File(directory), listener);
+    }
+
+    void watch() {
+        logger.info(String.format("Starting file watcher for directory: %s",
+                directory));
+
+        Map<File, FileAttributes> cache = new HashMap<>();
+        List<File> files = Arrays.asList(directory.listFiles());
+
+        populateCache(cache, files);
+
+        while (!Thread.currentThread().isInterrupted()) {
+            for (File file : files) {
+                if (cache.containsKey(file)) {
+                    FileAttributes cachedFileAttr = cache.get(file);
+                    if (cachedFileAttr.size != file.length()
+                            || cachedFileAttr.lastModified != file.lastModified()) {
+                        try {
+                            // updated:
+                            logger.info(String.format("File '%s' was updated", file.getAbsolutePath()));
+                            fileListener.processFile(file, FileListener.FileListenerEventType.UPDATED);
+                        } catch (Exception e) {
+                            logger.severe(String.format(
+                                    "Error processing file '%s': %s%n%s", file, e.getMessage(), ExceptionUtilities.getStackTraceAsString(e)));
+                        }
+                    }
+                } else {
+                    // created:
+                    logger.info(String.format("File '%s' was created", file.getAbsolutePath()));
+                    fileListener.processFile(file, FileListener.FileListenerEventType.CREATED);
+                }
+            }
+
+            // some files may have been deleted so try to find them
+            List<File> deleteCandidates = new LinkedList<>(files);
+            cache.keySet().stream()
+                    .filter(cachedFile -> !deleteCandidates.contains(cachedFile))
+                    .forEach(cachedFile -> {
+                        fileListener.processFile(cachedFile,
+                                FileListener.FileListenerEventType.DELETED);
+                        logger.info(String.format("File '%s' was deleted", cachedFile.getAbsolutePath()));
+                    });
+
+            populateCache(cache, files);
+            try {
+                Thread.sleep(checkFrequencyMillis);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            files = Arrays.asList(directory.listFiles());
+        }
+    }
+
+    private void populateCache(Map<File, FileAttributes> cache, List<File> files) {
+        cache.clear();
+        files.stream()
+                .forEach(file -> cache.put(file, new FileAttributes(file.length(), file.lastModified())));
+    }
+
+    @Override
+    public void close() throws IOException {
+        if (thread != null) {
+            thread.shutdownNow();
+        }
+    }
+
+    public final void setFilter(final FilenameFilter filter) {
+        this.filter = (dir, name) -> defaultFilter.accept(dir, name)
+                && filter.accept(dir, name);
+    }
 }
