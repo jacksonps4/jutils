@@ -41,6 +41,8 @@ public class FileWatcher implements Closeable {
     private static final class FileAttributes {
         final long size;
         final long lastModified;
+        boolean changeFlag;
+        long changeLastSeen;
 
         public FileAttributes(long size, long lastModified) {
             super();
@@ -75,7 +77,7 @@ public class FileWatcher implements Closeable {
                 directory));
 
         Map<File, FileAttributes> cache = new HashMap<>();
-        List<File> files = Arrays.asList(directory.listFiles());
+        List<File> files = Arrays.asList(directory.listFiles(filter));
 
         populateCache(cache, files);
 
@@ -84,11 +86,18 @@ public class FileWatcher implements Closeable {
                 if (cache.containsKey(file)) {
                     FileAttributes cachedFileAttr = cache.get(file);
                     if (cachedFileAttr.size != file.length()
-                            || cachedFileAttr.lastModified != file.lastModified()) {
+                            || cachedFileAttr.lastModified != file.lastModified() || cachedFileAttr.changeFlag) {
                         try {
-                            // updated:
-                            logger.info(String.format("File '%s' was updated", file.getAbsolutePath()));
-                            fileListener.processFile(file, FileListener.FileListenerEventType.UPDATED);
+                            if (cachedFileAttr.changeFlag
+                                    && (System.currentTimeMillis() - cachedFileAttr.changeLastSeen) >= 2000L) {
+                                cachedFileAttr.changeFlag = false;
+                                // updated:
+                                logger.info(String.format("File '%s' was updated", file.getAbsolutePath()));
+                                fileListener.processFile(file, FileListener.FileListenerEventType.UPDATED);
+                            } else if (!cachedFileAttr.changeFlag) {
+                                cachedFileAttr.changeFlag = true;
+                                cachedFileAttr.changeLastSeen = System.currentTimeMillis();
+                            }
                         } catch (Exception e) {
                             logger.severe(String.format(
                                     "Error processing file '%s': %s%n%s", file, e.getMessage(), ExceptionUtilities.getStackTraceAsString(e)));
